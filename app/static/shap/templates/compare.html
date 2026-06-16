@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modelių palyginimas · GameFinder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg:      #0d0f14;
+            --surface: #161922;
+            --border:  #2a2d3a;
+            --accent:  #4fffb0;
+            --accent2: #00b4ff;
+            --yellow:  #ffc107;
+            --text:    #e8eaf0;
+            --muted:   #6b7280;
+            --card-bg: #1c1f2e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'DM Sans', sans-serif; min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(79,255,176,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0,180,255,0.04) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(13,15,20,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex; align-items: center; gap: 2rem; height: 56px;
+        }
+
+        .nav-logo {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.1em;
+            color: var(--accent); text-decoration: none;
+        }
+
+        .nav-links { display: flex; gap: 1.5rem; margin-left: auto; }
+        .nav-links a {
+            color: var(--muted); text-decoration: none;
+            font-size: 0.85rem; font-weight: 500; transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: var(--text); }
+
+        /* ── Hero ── */
+        .page-hero {
+            position: relative; z-index: 1;
+            text-align: center; padding: 3rem 2rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero-tag {
+            display: inline-block;
+            font-size: 0.7rem; font-weight: 500;
+            letter-spacing: 0.2em; text-transform: uppercase;
+            color: var(--accent2);
+            border: 1px solid rgba(0,180,255,0.3);
+            padding: 0.3rem 0.8rem; border-radius: 2px; margin-bottom: 1rem;
+        }
+
+        .page-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, #fff 40%, var(--accent2) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-subtitle { color: var(--muted); font-size: 0.9rem; }
+
+        /* ── Turinys ── */
+        .content {
+            max-width: 1000px; margin: 0 auto;
+            padding: 2rem 2rem 4rem;
+            position: relative; z-index: 1;
+        }
+
+        /* ── Modelių aprašymai ── */
+        .models-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 1rem; margin-bottom: 2rem;
+        }
+
+        @media (max-width: 600px) { .models-grid { grid-template-columns: 1fr; } }
+
+        .model-card {
+            background: var(--surface);
+            border: 1px solid var(--border); border-radius: 4px;
+            padding: 1.2rem 1.5rem;
+        }
+
+        .model-card.svd { border-left: 3px solid var(--accent); }
+        .model-card.ncf { border-left: 3px solid var(--accent2); }
+
+        .model-name {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.05em;
+            margin-bottom: 0.4rem;
+        }
+
+        .model-card.svd .model-name { color: var(--accent); }
+        .model-card.ncf .model-name { color: var(--accent2); }
+
+        .model-desc { font-size: 0.82rem; line-height: 1.6; color: #b8bcc8; }
+
+        .model-tech {
+            margin-top: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.3rem;
+        }
+
+        .tech-tag {
+            font-size: 0.65rem; padding: 0.2rem 0.5rem;
+            border-radius: 2px; border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        /* ── Sekcijų pavadinimai ── */
+        .section-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.2rem; letter-spacing: 0.05em;
+            color: var(--muted); margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Metrikos lentelė ── */
+        .metrics-table {
+            width: 100%; border-collapse: collapse;
+            margin-bottom: 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border); border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .metrics-table th {
+            font-size: 0.72rem; font-weight: 600;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--muted); padding: 0.8rem 1.2rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .metrics-table td {
+            padding: 0.9rem 1.2rem;
+            border-bottom: 1px solid rgba(42,45,58,0.5);
+            font-size: 0.85rem;
+        }
+
+        .metrics-table tr:last-child td { border-bottom: none; }
+        .metrics-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .model-badge {
+            display: inline-block; font-size: 0.72rem;
+            font-weight: 600; padding: 0.2rem 0.6rem;
+            border-radius: 2px;
+        }
+        .badge-svd { background: rgba(79,255,176,0.1); color: var(--accent); }
+        .badge-ncf { background: rgba(0,180,255,0.1);  color: var(--accent2); }
+
+        .metric-value {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.1rem;
+        }
+        .metric-good { color: var(--accent); }
+        .metric-ok   { color: var(--yellow); }
+        .metric-bad  { color: #ff6b6b; }
+
+        /* ── Bar chart ── */
+        .chart-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border); border-radius: 4px;
+            padding: 1.5rem; margin-bottom: 2rem;
+        }
+
+        .chart-canvas { max-height: 300px; }
+
+        /* ── Paaiškinimas ── */
+        .explanation-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--yellow);
+            border-radius: 4px; padding: 1.2rem 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .explanation-label {
+            font-size: 0.7rem; font-weight: 500;
+            letter-spacing: 0.15em; text-transform: uppercase;
+            color: var(--yellow); margin-bottom: 0.6rem;
+        }
+
+        .explanation-text { font-size: 0.85rem; line-height: 1.7; color: #b8bcc8; }
+
+        /* ── Metrikos apibrėžimai ── */
+        .definitions-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) { .definitions-grid { grid-template-columns: 1fr; } }
+
+        .def-card {
+            background: var(--surface);
+            border: 1px solid var(--border); border-radius: 4px;
+            padding: 1rem 1.2rem;
+        }
+
+        .def-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.1rem; color: var(--accent2);
+            margin-bottom: 0.4rem;
+        }
+
+        .def-text { font-size: 0.78rem; line-height: 1.6; color: var(--muted); }
+
+        footer {
+            text-align: center; padding: 2rem; color: var(--muted);
+            font-size: 0.72rem; border-top: 1px solid var(--border);
+            position: relative; z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">🎮 GameFinder</a>
+    <div class="nav-links">
+        <a href="/compare" class="active">Modelių palyginimas</a>
+        <a href="/profile">Profilis</a>
+    </div>
+</nav>
+
+<div class="page-hero">
+    <div class="hero-tag">ML · Collaborative Filtering</div>
+    <h1 class="page-title">Modelių palyginimas</h1>
+    <p class="page-subtitle">SVD vs NCF — du rekomendacijų algoritmai</p>
+</div>
+
+<div class="content">
+
+    <!-- Modelių aprašymai -->
+    <div class="section-title">MODELIAI</div>
+    <div class="models-grid">
+        <div class="model-card svd">
+            <div class="model-name">SVD</div>
+            <p class="model-desc">
+                Truncated Singular Value Decomposition — matricos faktorizacijos metodas.
+                User-Item matricą skaido į latentinius faktorius (50 komponentų).
+                Kiekvienas žaidimas ir vartotojas gauna 50d vektorių, reprezentuojantį
+                paslėptus interesus. Rekomendacijos skaičiuojamos pagal kosinusinį panašumą
+                tarp žaidimų vektorių.
+            </p>
+            <div class="model-tech">
+                <span class="tech-tag">TruncatedSVD</span>
+                <span class="tech-tag">scipy sparse</span>
+                <span class="tech-tag">log(1+hours)</span>
+                <span class="tech-tag">žanro boost +20%</span>
+                <span class="tech-tag">50 komponentų</span>
+            </div>
+        </div>
+
+        <div class="model-card ncf">
+            <div class="model-name">NCF</div>
+            <p class="model-desc">
+                Neural Collaborative Filtering — gilus neuroninis tinklas.
+                Vartotojas ir žaidimas koduojami į 64d embeddings, sujungiami
+                ir perduodami per MLP su 3 sluoksniais. Modelis mokosi
+                sudėtingų nelinijinių priklausomybių tarp vartotojų ir žaidimų.
+                Treniruotas 20 epochų su BCELoss.
+            </p>
+            <div class="model-tech">
+                <span class="tech-tag">PyTorch</span>
+                <span class="tech-tag">Embedding 64d</span>
+                <span class="tech-tag">MLP 3 sluoksniai</span>
+                <span class="tech-tag">BCELoss</span>
+                <span class="tech-tag">Adam optimizer</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrikos -->
+    <div class="section-title">METRIKOS — Precision@10 ir Recall@10</div>
+
+    {% if metrics %}
+    <table class="metrics-table">
+        <thead>
+            <tr>
+                <th>Modelis</th>
+                <th>Precision@10</th>
+                <th>Recall@10</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in metrics %}
+            <tr>
+                <td>
+                    <span class="model-badge {% if m.model == 'svd' %}badge-svd{% else %}badge-ncf{% endif %}">
+                        {{ m.model | upper }}
+                    </span>
+                </td>
+                <td>
+                    <span class="metric-value {% if m.precision >= 0.3 %}metric-good{% elif m.precision >= 0.1 %}metric-ok{% else %}metric-bad{% endif %}">
+                        {{ "%.4f" | format(m.precision) }}
+                    </span>
+                </td>
+                <td>
+                    <span class="metric-value {% if m.recall >= 0.3 %}metric-good{% elif m.recall >= 0.1 %}metric-ok{% else %}metric-bad{% endif %}">
+                        {{ "%.4f" | format(m.recall) }}
+                    </span>
+                </td>
+                <td style="color: var(--muted); font-size: 0.75rem;">{{ m.date }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Grafikas -->
+    <div class="section-title">VIZUALIZACIJA</div>
+    <div class="chart-wrap">
+        <canvas id="metricsChart" class="chart-canvas"></canvas>
+    </div>
+
+    {% else %}
+    <div style="text-align:center; color: var(--muted); padding: 2rem;">
+        Metrikos dar neskaičiuotos. Paleisk <code>src/04_recommend.py</code>.
+    </div>
+    {% endif %}
+
+    <!-- Paaiškinimas -->
+    <div class="explanation-block">
+        <div class="explanation-label">📊 Kaip interpretuoti</div>
+        <p class="explanation-text">
+            <strong>Precision@10</strong> — iš 10 rekomenduotų žaidimų, kiek procentų iš tikrųjų tinka vartotojui.
+            Pvz. 0.30 reiškia kad 3 iš 10 rekomendacijų yra tinkamos.<br><br>
+            <strong>Recall@10</strong> — kiek procentų visų tinkamų žaidimų pavyko rasti tarp 10 rekomendacijų.
+            Mažas Recall@10 normalus — sunku rasti visus tinkamus žaidimus iš tūkstančių.<br><br>
+            <strong>SVD</strong> paprastai geresnis kai duomenys reti (sparse), nes nereikalauja daug treniravimo.
+            <strong>NCF</strong> gali būti geresnis su tankiais duomenimis ir sudėtingomis priklausomybėmis.
+        </p>
+    </div>
+
+    <!-- Metrikos apibrėžimai -->
+    <div class="section-title">APIBRĖŽIMAI</div>
+    <div class="definitions-grid">
+        <div class="def-card">
+            <div class="def-title">Precision@K</div>
+            <p class="def-text">
+                Tikslumas — iš K rekomenduotų žaidimų, kiek yra relevantiški.
+                Relevantiškumas apibrėžiamas: du žaidimai laikomi panašiais,
+                jei juos abu žaidė ≥10 bendrų vartotojų.
+                <br><br>
+                <code>Precision@K = |relevantiški ∩ rekomenduoti| / K</code>
+            </p>
+        </div>
+        <div class="def-card">
+            <div class="def-title">Recall@K</div>
+            <p class="def-text">
+                Pilnumas — iš visų relevantiškų žaidimų, kiek pavyko
+                rasti tarp K rekomendacijų. Visada mažas skaičius, nes
+                relevantiškų žaidimų gali būti šimtai.
+                <br><br>
+                <code>Recall@K = |relevantiški ∩ rekomenduoti| / |visi relevantiški|</code>
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    Steam žaidimų paieškos sistema · CodeAcademy baigiamasis darbas · Kęstas Trybė · 2026
+</footer>
+
+{% if metrics %}
+<script>
+const metrics = {{ metrics | tojson }};
+
+const svd = metrics.find(m => m.model === 'svd') || {};
+const ncf = metrics.find(m => m.model === 'ncf') || {};
+
+const ctx = document.getElementById('metricsChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Precision@10', 'Recall@10'],
+        datasets: [
+            {
+                label: 'SVD',
+                data: [svd.precision || 0, svd.recall || 0],
+                backgroundColor: 'rgba(79,255,176,0.3)',
+                borderColor: '#4fffb0',
+                borderWidth: 2,
+                borderRadius: 4,
+            },
+            {
+                label: 'NCF',
+                data: [ncf.precision || 0, ncf.recall || 0],
+                backgroundColor: 'rgba(0,180,255,0.3)',
+                borderColor: '#00b4ff',
+                borderWidth: 2,
+                borderRadius: 4,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: { color: '#e8eaf0', font: { family: 'DM Sans' } }
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: '#6b7280' },
+                grid: { color: 'rgba(42,45,58,0.5)' }
+            },
+            y: {
+                beginAtZero: true,
+                max: 1,
+                ticks: { color: '#6b7280' },
+                grid: { color: 'rgba(42,45,58,0.5)' }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+
+</body>
+</html>

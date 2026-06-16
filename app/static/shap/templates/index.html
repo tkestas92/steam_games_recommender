@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Game Finder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:      #0d0f14;
+            --surface: #161922;
+            --border:  #2a2d3a;
+            --accent:  #4fffb0;
+            --accent2: #00b4ff;
+            --text:    #e8eaf0;
+            --muted:   #6b7280;
+            --card-bg: #1c1f2e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(79,255,176,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0,180,255,0.04) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(13,15,20,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex; align-items: center; gap: 2rem; height: 56px;
+        }
+
+        .nav-logo {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.1em;
+            color: var(--accent); text-decoration: none;
+        }
+
+        .nav-links { display: flex; gap: 1.5rem; margin-left: auto; }
+        .nav-links a {
+            color: var(--muted); text-decoration: none;
+            font-size: 0.85rem; font-weight: 500; transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--text); }
+
+        /* ── Hero ── */
+        .hero {
+            position: relative; z-index: 1;
+            text-align: center; padding: 4rem 2rem 2rem;
+        }
+
+        .hero-tag {
+            display: inline-block;
+            font-size: 0.7rem; font-weight: 500;
+            letter-spacing: 0.2em; text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid rgba(79,255,176,0.3);
+            padding: 0.3rem 0.8rem; border-radius: 2px; margin-bottom: 1.2rem;
+        }
+
+        .hero h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            letter-spacing: 0.05em; line-height: 0.95; margin-bottom: 0.8rem;
+            background: linear-gradient(135deg, #fff 40%, var(--accent) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--muted); font-size: 0.95rem;
+            max-width: 400px; margin: 0 auto 2rem; line-height: 1.6;
+        }
+
+        /* ── Paieška ── */
+        .search-wrap { max-width: 680px; margin: 0 auto; }
+
+        .search-form {
+            display: flex; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-form:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(79,255,176,0.08);
+        }
+
+        .search-input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text); font-family: 'DM Sans', sans-serif;
+            font-size: 1rem; padding: 1rem 1.2rem;
+        }
+        .search-input::placeholder { color: var(--muted); }
+
+        .search-btn {
+            background: var(--accent); border: none; color: #0d0f14;
+            font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+            font-weight: 600; letter-spacing: 0.05em; padding: 0 1.5rem;
+            cursor: pointer; transition: background 0.2s; white-space: nowrap;
+        }
+        .search-btn:hover { background: #3de8a0; }
+
+        .suggestions {
+            display: flex; flex-wrap: wrap; gap: 0.4rem;
+            justify-content: center; margin-top: 0.8rem;
+        }
+        .suggestion-chip {
+            font-size: 0.72rem; color: var(--muted);
+            border: 1px solid var(--border); border-radius: 2px;
+            padding: 0.25rem 0.6rem; cursor: pointer;
+            transition: all 0.15s; background: transparent;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .suggestion-chip:hover {
+            color: var(--accent); border-color: var(--accent);
+            background: rgba(79,255,176,0.05);
+        }
+
+        /* ── RAG ── */
+        .explanation-block {
+            max-width: 900px; margin: 2rem auto 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px; padding: 1.2rem 1.5rem;
+            position: relative; z-index: 1;
+        }
+        .explanation-label {
+            font-size: 0.7rem; font-weight: 500;
+            letter-spacing: 0.15em; text-transform: uppercase;
+            color: var(--accent); margin-bottom: 0.6rem;
+        }
+        .explanation-text { font-size: 0.88rem; line-height: 1.7; color: #b8bcc8; }
+
+        /* ── Rezultatų sekcija ── */
+        .compare-section {
+            max-width: 100%;
+            margin: 2.5rem auto;
+            padding: 0 1.5rem;
+            position: relative; z-index: 1;
+        }
+
+        .compare-header {
+            display: flex; align-items: center; gap: 1rem;
+            margin-bottom: 1.2rem;
+            border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;
+        }
+
+        .compare-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.05em;
+        }
+
+        .compare-subtitle { font-size: 0.8rem; color: var(--muted); }
+
+        /* ── Horizontalus scroll ── */
+        .compare-grid {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding-bottom: 0.8rem;
+        }
+
+        .compare-grid::-webkit-scrollbar { height: 4px; }
+        .compare-grid::-webkit-scrollbar-track { background: var(--border); border-radius: 2px; }
+        .compare-grid::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+        /* ── Vienas stulpelis ── */
+        .mode-column {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px; overflow: hidden;
+            min-width: 210px;
+            flex-shrink: 0;
+        }
+
+        .mode-header {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .mode-icon { font-size: 1rem; }
+
+        .mode-name {
+            font-size: 0.8rem; font-weight: 600;
+            letter-spacing: 0.05em; text-transform: uppercase;
+        }
+
+        .mode-formula {
+            font-size: 0.65rem; color: var(--muted);
+            margin-left: auto;
+        }
+
+        /* Spalvos pagal režimą */
+        .mode-balanced   .mode-header { border-left: 3px solid var(--accent); }
+        .mode-semantic   .mode-header { border-left: 3px solid #c864ff; }
+        .mode-popular    .mode-header { border-left: 3px solid var(--accent2); }
+        .mode-logarithmic .mode-header { border-left: 3px solid #ffc107; }
+        .mode-keyword    .mode-header { border-left: 3px solid #ff6b6b; }
+        .mode-knn        .mode-header { border-left: 3px solid #ff9f43; }
+
+        .mode-balanced   .mode-name { color: var(--accent); }
+        .mode-semantic   .mode-name { color: #c864ff; }
+        .mode-popular    .mode-name { color: var(--accent2); }
+        .mode-logarithmic .mode-name { color: #ffc107; }
+        .mode-keyword    .mode-name { color: #ff6b6b; }
+        .mode-knn        .mode-name { color: #ff9f43; }
+
+        /* ── Žaidimo eilutė ── */
+        .game-row {
+            display: flex; align-items: center; gap: 0.7rem;
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid rgba(42,45,58,0.5);
+            text-decoration: none; color: inherit;
+            transition: background 0.15s;
+        }
+        .game-row:last-child { border-bottom: none; }
+        .game-row:hover { background: rgba(255,255,255,0.03); }
+
+        .game-row-rank {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.2rem; color: var(--border);
+            min-width: 1.5rem; text-align: center;
+        }
+
+        .game-row-img {
+            width: 56px; height: 32px; object-fit: cover;
+            border-radius: 2px; flex-shrink: 0;
+            background: var(--border);
+        }
+
+        .game-row-info { flex: 1; min-width: 0; }
+
+        .game-row-title {
+            font-size: 0.78rem; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 0.15rem;
+        }
+
+        .game-row-meta {
+            display: flex; gap: 0.4rem; align-items: center;
+        }
+
+        .mini-rating {
+            font-size: 0.62rem; padding: 0.1rem 0.3rem;
+            border-radius: 2px; font-weight: 500;
+        }
+        .rating-positive { background: rgba(79,255,176,0.1); color: var(--accent); }
+        .rating-mixed    { background: rgba(255,193,7,0.1);  color: #ffc107; }
+        .rating-negative { background: rgba(255,107,107,0.1);color: #ff6b6b; }
+
+        .mini-score {
+            font-size: 0.65rem; font-weight: 600;
+            color: var(--muted); margin-left: auto;
+        }
+
+        /* ── Custom slankikliai ── */
+        .mode-custom .mode-header { border-left: 3px solid #ff9f43; }
+        .mode-custom .mode-name   { color: #ff9f43; }
+
+        .custom-sliders {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,159,67,0.03);
+        }
+
+        .slider-row {
+            display: flex; align-items: center; gap: 0.5rem;
+            margin-bottom: 0.5rem; font-size: 0.72rem;
+        }
+        .slider-row:last-child { margin-bottom: 0; }
+
+        .slider-label { min-width: 80px; color: var(--muted); }
+
+        .slider-input {
+            flex: 1; height: 3px; cursor: pointer;
+            accent-color: #ff9f43;
+        }
+
+        .slider-value {
+            min-width: 32px; text-align: right;
+            color: #ff9f43; font-weight: 600; font-size: 0.68rem;
+        }
+
+        .custom-total {
+            font-size: 0.65rem; color: var(--muted);
+            text-align: right; padding: 0.3rem 0 0;
+        }
+        .custom-total.over { color: #ff6b6b; }
+
+        .history-section {
+            max-width: 680px; margin: 0 auto 1.5rem;
+            padding: 0 2rem; position: relative; z-index: 1;
+        }
+        .history-label {
+            font-size: 0.68rem; letter-spacing: 0.15em;
+            text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem;
+        }
+        .history-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .history-item {
+            font-size: 0.72rem; color: var(--muted);
+            border: 1px solid var(--border); padding: 0.2rem 0.5rem;
+            border-radius: 2px; text-decoration: none; transition: all 0.15s;
+        }
+        .history-item:hover { color: var(--accent2); border-color: var(--accent2); }
+
+        footer {
+            text-align: center; padding: 2rem; color: var(--muted);
+            font-size: 0.72rem; border-top: 1px solid var(--border);
+            margin-top: 4rem; position: relative; z-index: 1;
+        }
+
+        .error-msg { text-align: center; color: #ff6b6b; margin: 2rem 0; }
+
+        /* ── SVD Rekomendacijos ── */
+        .svd-section {
+            max-width: 1400px; margin: 2rem auto;
+            padding: 0 1.5rem; position: relative; z-index: 1;
+        }
+
+        .svd-header {
+            display: flex; align-items: baseline; gap: 1rem;
+            margin-bottom: 1.2rem;
+            border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;
+        }
+
+        .svd-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.05em;
+            color: var(--accent2);
+        }
+
+        .svd-subtitle { font-size: 0.8rem; color: var(--muted); }
+        .svd-subtitle strong { color: var(--text); }
+
+        .svd-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 1100px) { .svd-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 700px)  { .svd-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .svd-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border); border-radius: 4px;
+            text-decoration: none; color: inherit;
+            overflow: hidden; transition: border-color 0.15s, transform 0.15s;
+        }
+        .svd-card:hover {
+            border-color: var(--accent2);
+            transform: translateY(-2px);
+        }
+
+        .svd-img {
+            width: 100%; height: 80px; object-fit: cover;
+            display: block; background: var(--border);
+        }
+        .svd-img-placeholder {
+            width: 100%; height: 80px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; background: var(--border);
+        }
+
+        .svd-info { padding: 0.6rem 0.8rem; }
+        .svd-card-title {
+            font-size: 0.75rem; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 0.2rem;
+        }
+        .svd-score { font-size: 0.65rem; color: var(--accent2); font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">🎮 GameFinder</a>
+    <div class="nav-links">
+        <a href="/compare">Modelių palyginimas</a>
+        <a href="/profile">Profilis</a>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="hero-tag">AI · Semantinė paieška · Steam</div>
+    <h1>Rask savo<br>žaidimą</h1>
+    <p>Aprašyk kokio žaidimo ieškai natūralia kalba</p>
+
+    <div class="search-wrap">
+        <form class="search-form" method="GET" action="/search" id="searchForm">
+            <input
+                type="text" name="q"
+                class="search-input"
+                placeholder="dark fantasy RPG with crafting..."
+                value="{{ query or '' }}"
+                autocomplete="off" id="searchInput"
+            >
+            <button type="submit" class="search-btn">IEŠKOTI</button>
+        </form>
+
+        <div class="suggestions">
+            <button class="suggestion-chip" onclick="setQuery('open world RPG adventure')">open world RPG</button>
+            <button class="suggestion-chip" onclick="setQuery('relaxing city builder')">city builder</button>
+            <button class="suggestion-chip" onclick="setQuery('horror survival game')">horror survival</button>
+            <button class="suggestion-chip" onclick="setQuery('multiplayer shooter sci-fi')">sci-fi shooter</button>
+            <button class="suggestion-chip" onclick="setQuery('indie puzzle platformer')">indie puzzle</button>
+        </div>
+    </div>
+</section>
+
+{% if history and not query %}
+<div class="history-section">
+    <div class="history-label">Paieškos istorija</div>
+    <div class="history-list">
+        {% for h in history %}
+        <a href="/search?q={{ h | urlencode }}" class="history-item">{{ h }}</a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="error-msg">⚠️ {{ error }}</div>
+{% endif %}
+
+{% if query %}
+<div class="explanation-block" id="explanationBlock">
+    <div class="explanation-label">🤖 AI paaiškinimas</div>
+    <div class="explanation-text" id="explanationText">
+        <span style="color:var(--muted)">⏳ Kraunama...</span>
+    </div>
+</div>
+{% endif %}
+
+{% if all_results %}
+<section class="compare-section">
+    <div class="compare-header">
+        <span class="compare-title">Rezultatai</span>
+        <span class="compare-subtitle">„{{ query }}" · 4 rikiavimo režimai palyginimui</span>
+    </div>
+
+    <div class="compare-grid">
+
+        <!-- KEYWORD -->
+        <div class="mode-column mode-keyword">
+            <div class="mode-header">
+                <span class="mode-icon">🔤</span>
+                <span class="mode-name">Keyword</span>
+                <span class="mode-formula">SQL ILIKE</span>
+            </div>
+            {% for game in all_results.keyword %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+            {% if not all_results.keyword %}
+            <div style="padding:1rem; color:var(--muted); font-size:0.78rem; text-align:center;">Nerasta</div>
+            {% endif %}
+        </div>
+
+        <!-- KNN -->
+        <div class="mode-column mode-knn">
+            <div class="mode-header">
+                <span class="mode-icon">📍</span>
+                <span class="mode-name">KNN</span>
+                <span class="mode-formula">TF-IDF cosine</span>
+            </div>
+            {% for game in all_results.knn %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- SUBALANSUOTAS -->
+        <div class="mode-column mode-balanced">
+            <div class="mode-header">
+                <span class="mode-icon">⚖️</span>
+                <span class="mode-name">Subalansuotas</span>
+                <span class="mode-formula">sem×0.8 + ratio×0.2</span>
+            </div>
+            {% for game in all_results.balanced %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- SEMANTINIS -->
+        <div class="mode-column mode-semantic">
+            <div class="mode-header">
+                <span class="mode-icon">🧠</span>
+                <span class="mode-name">Semantinis</span>
+                <span class="mode-formula">sem×1.0</span>
+            </div>
+            {% for game in all_results.semantic %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- POPULIARUS -->
+        <div class="mode-column mode-popular">
+            <div class="mode-header">
+                <span class="mode-icon">🔥</span>
+                <span class="mode-name">Populiarus</span>
+                <span class="mode-formula">sem×0.6 + ratio×0.4</span>
+            </div>
+            {% for game in all_results.popular %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- LOGARITMINIS -->
+        <div class="mode-column mode-logarithmic">
+            <div class="mode-header">
+                <span class="mode-icon">📊</span>
+                <span class="mode-name">Logaritminis</span>
+                <span class="mode-formula">sem×0.8 + log×0.1 + ratio×0.1</span>
+            </div>
+            {% for game in all_results.logarithmic %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- CUSTOM -->
+        <div class="mode-column mode-custom">
+            <div class="mode-header">
+                <span class="mode-icon">🎛️</span>
+                <span class="mode-name">Custom</span>
+                <span class="mode-formula">savi svoriai</span>
+            </div>
+
+            {% if all_results and all_results.custom %}
+            {% for game in all_results.custom %}
+            <a href="/game/{{ game.app_id }}" class="game-row">
+                <span class="game-row-rank">{{ game.rank }}</span>
+                {% if game.header_image %}
+                <img src="{{ game.header_image }}" class="game-row-img" loading="lazy">
+                {% else %}
+                <div class="game-row-img" style="display:flex;align-items:center;justify-content:center;">🎮</div>
+                {% endif %}
+                <div class="game-row-info">
+                    <div class="game-row-title">{{ game.title }}</div>
+                    <div class="game-row-meta">
+                        {% if game.positive_ratio %}
+                            {% if game.positive_ratio >= 80 %}
+                            <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                            {% elif game.positive_ratio >= 60 %}
+                            <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                            {% else %}
+                            <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+            {% else %}
+            <div style="padding:1rem; color: var(--muted); font-size:0.78rem; text-align:center;">
+                Ieškokite kad pamatytumėte rezultatus
+            </div>
+            {% endif %}
+
+            <div class="custom-sliders">
+                <div class="slider-row">
+                    <span class="slider-label">Semantika</span>
+                    <input type="range" class="slider-input" id="sl_sem" min="0" max="100"
+                           value="{{ ((w_sem or 0.8) * 100) | int }}" oninput="updateCustom()">
+                    <span class="slider-value" id="v_sem">{{ ((w_sem or 0.8) * 100) | int }}%</span>
+                </div>
+                <div class="slider-row">
+                    <span class="slider-label">Reitingas %</span>
+                    <input type="range" class="slider-input" id="sl_ratio" min="0" max="100"
+                           value="{{ ((w_ratio or 0.1) * 100) | int }}" oninput="updateCustom()">
+                    <span class="slider-value" id="v_ratio">{{ ((w_ratio or 0.1) * 100) | int }}%</span>
+                </div>
+                <div class="slider-row">
+                    <span class="slider-label">Apžvalgos</span>
+                    <input type="range" class="slider-input" id="sl_log" min="0" max="100"
+                           value="{{ ((w_log or 0.1) * 100) | int }}" oninput="updateCustom()">
+                    <span class="slider-value" id="v_log">{{ ((w_log or 0.1) * 100) | int }}%</span>
+                </div>
+                <div class="custom-total" id="customTotal">Suma: 100%</div>
+                <button onclick="applyCustom()" style="
+                    width:100%; margin-top:0.6rem; padding:0.4rem;
+                    background: rgba(255,159,67,0.15); border: 1px solid #ff9f43;
+                    color: #ff9f43; border-radius:2px; cursor:pointer;
+                    font-family:'DM Sans',sans-serif; font-size:0.72rem; font-weight:600;
+                    letter-spacing:0.05em;
+                ">TAIKYTI →</button>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endif %}
+
+{% if svd_recs %}
+<section class="svd-section">
+    <div class="svd-header">
+        <span class="svd-title">🎯 Rekomendacijos</span>
+        <span class="svd-subtitle">
+            Žaidėjai kurie žaidė <strong>{{ svd_source_title }}</strong>, žaidė ir šiuos žaidimus
+        </span>
+    </div>
+
+    <div class="svd-grid">
+        {% for game in svd_recs %}
+        <a href="/game/{{ game.app_id }}" class="svd-card">
+            {% if game.header_image %}
+            <img src="{{ game.header_image }}" class="svd-img" loading="lazy">
+            {% else %}
+            <div class="svd-img svd-img-placeholder">🎮</div>
+            {% endif %}
+            <div class="svd-info">
+                <div class="svd-card-title">{{ game.title }}</div>
+                <div class="svd-score">{{ "%.2f"|format(game.score) }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<footer>
+    Steam žaidimų paieškos sistema · CodeAcademy baigiamasis darbas · Kęstas Trybė · 2026
+</footer>
+
+<script>
+// Async AI paaiškinimas
+{% if query %}
+(async function() {
+    try {
+        const resp = await fetch(`/api/explain?q={{ query | urlencode }}`);
+        const data = await resp.json();
+        const el = document.getElementById('explanationText');
+        if (el) {
+            el.textContent = data.explanation || 'Paaiškinimas nepasiekiamas.';
+        }
+    } catch(e) {
+        const el = document.getElementById('explanationText');
+        if (el) el.textContent = 'Paaiškinimas nepasiekiamas.';
+    }
+})();
+{% endif %}
+
+function setQuery(text) {
+    document.getElementById('searchInput').value = text;
+    document.getElementById('searchInput').focus();
+}
+
+function updateCustom() {
+    const sem   = parseInt(document.getElementById('sl_sem').value);
+    const ratio = parseInt(document.getElementById('sl_ratio').value);
+    const log   = parseInt(document.getElementById('sl_log').value);
+
+    document.getElementById('v_sem').textContent   = sem + '%';
+    document.getElementById('v_ratio').textContent = ratio + '%';
+    document.getElementById('v_log').textContent   = log + '%';
+
+    const total = sem + ratio + log;
+    const el = document.getElementById('customTotal');
+    el.textContent = `Suma: ${total}%`;
+    el.className = 'custom-total' + (total !== 100 ? ' over' : '');
+}
+
+function applyCustom() {
+    const q     = document.getElementById('searchInput').value.trim();
+    const sem   = parseInt(document.getElementById('sl_sem').value) / 100;
+    const ratio = parseInt(document.getElementById('sl_ratio').value) / 100;
+    const log   = parseInt(document.getElementById('sl_log').value) / 100;
+    if (!q) return;
+    window.location.href = `/search?q=${encodeURIComponent(q)}&mode=custom&w_sem=${sem}&w_ratio=${ratio}&w_log=${log}`;
+}
+</script>
+
+</body>
+</html>

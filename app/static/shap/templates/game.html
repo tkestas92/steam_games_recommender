@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ game.title }} · GameFinder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:      #0d0f14;
+            --surface: #161922;
+            --border:  #2a2d3a;
+            --accent:  #4fffb0;
+            --accent2: #00b4ff;
+            --accent3: #a78bfa;
+            --text:    #e8eaf0;
+            --muted:   #6b7280;
+            --card-bg: #1c1f2e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'DM Sans', sans-serif; min-height: 100vh;
+        }
+
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(13,15,20,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex; align-items: center; gap: 2rem; height: 56px;
+        }
+
+        .nav-logo {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.1em;
+            color: var(--accent); text-decoration: none;
+        }
+
+        .nav-back {
+            color: var(--muted); text-decoration: none;
+            font-size: 0.85rem; transition: color 0.2s;
+        }
+        .nav-back:hover { color: var(--text); }
+
+        /* ── Hero ── */
+        .game-hero {
+            position: relative; overflow: hidden;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .game-hero-bg {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            filter: blur(20px) brightness(0.3);
+            transform: scale(1.1);
+        }
+
+        .game-hero-content {
+            position: relative; z-index: 1;
+            max-width: 1000px; margin: 0 auto;
+            padding: 3rem 2rem;
+            display: flex; gap: 2rem; align-items: flex-start;
+        }
+
+        .game-cover {
+            width: 232px; height: 130px; object-fit: cover;
+            border-radius: 4px; flex-shrink: 0;
+            border: 1px solid var(--border);
+        }
+
+        .game-cover-placeholder {
+            width: 232px; height: 130px;
+            background: var(--surface); border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 3rem; flex-shrink: 0;
+        }
+
+        .game-meta { flex: 1; }
+
+        .game-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            letter-spacing: 0.03em; line-height: 1;
+            margin-bottom: 0.8rem;
+        }
+
+        .game-tags {
+            display: flex; flex-wrap: wrap; gap: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .game-tag {
+            font-size: 0.72rem; padding: 0.2rem 0.6rem;
+            border-radius: 2px; border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .game-stats {
+            display: flex; gap: 1.5rem; align-items: center;
+        }
+
+        .stat-block { text-align: center; }
+        .stat-value {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.8rem; line-height: 1;
+        }
+        .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+        .stat-positive { color: var(--accent); }
+        .stat-price    { color: var(--accent2); }
+
+        /* ── Aprašymas ── */
+        .game-about {
+            max-width: 1000px; margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .section-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.2rem; letter-spacing: 0.05em;
+            color: var(--muted); margin-bottom: 0.8rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .about-text {
+            font-size: 0.9rem; line-height: 1.7;
+            color: #b8bcc8;
+        }
+
+        /* ── SHAP ── */
+        .shap-section {
+            max-width: 1000px; margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .shap-img {
+            max-width: 100%; border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .shap-features {
+            display: flex; flex-wrap: wrap; gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .shap-feature {
+            font-size: 0.75rem; padding: 0.3rem 0.7rem;
+            border-radius: 2px; font-weight: 500;
+        }
+        .shap-pos { background: rgba(79,255,176,0.1); color: var(--accent); border: 1px solid rgba(79,255,176,0.3); }
+        .shap-neg { background: rgba(255,107,107,0.1); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+
+        /* ── Rekomendacijos ── */
+        .recs-section {
+            max-width: 1000px; margin: 2rem auto;
+            padding: 0 2rem 2rem;
+        }
+
+        .recs-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 800px) { .recs-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 500px) { .recs-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .rec-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border); border-radius: 4px;
+            text-decoration: none; color: inherit; overflow: hidden;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .rec-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+        .rec-img {
+            width: 100%; height: 70px; object-fit: cover;
+            background: var(--border); display: block;
+        }
+
+        .rec-info { padding: 0.5rem 0.7rem; }
+        .rec-title {
+            font-size: 0.72rem; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 0.2rem;
+        }
+        .rec-score { font-size: 0.62rem; color: var(--accent); font-weight: 600; }
+
+        /* ── Modelių palyginimas badge ── */
+        .model-badge {
+            display: inline-block;
+            font-size: 0.65rem; padding: 0.15rem 0.5rem;
+            border-radius: 2px; margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        .badge-svd  { background: rgba(79,255,176,0.15); color: var(--accent); border: 1px solid rgba(79,255,176,0.3); }
+        .badge-ncf  { background: rgba(0,180,255,0.15); color: var(--accent2); border: 1px solid rgba(0,180,255,0.3); }
+        .badge-v28  { background: rgba(167,139,250,0.15); color: var(--accent3); border: 1px solid rgba(167,139,250,0.3); }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">🎮 GameFinder</a>
+    <a href="javascript:history.back()" class="nav-back">← Atgal</a>
+</nav>
+
+<!-- Hero -->
+<div class="game-hero">
+    {% if game.header_image %}
+    <div class="game-hero-bg" style="background-image: url('{{ game.header_image }}')"></div>
+    {% endif %}
+
+    <div class="game-hero-content">
+        {% if game.header_image %}
+        <img src="{{ game.header_image }}" class="game-cover" alt="{{ game.title }}">
+        {% else %}
+        <div class="game-cover-placeholder">🎮</div>
+        {% endif %}
+
+        <div class="game-meta">
+            <h1 class="game-title">{{ game.title }}</h1>
+
+            <div class="game-tags">
+                {% for tag in (game.genres or '').split(',')[:6] %}
+                <span class="game-tag">{{ tag.strip() }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="game-stats">
+                {% if game.positive_ratio %}
+                <div class="stat-block">
+                    <div class="stat-value stat-positive">{{ game.positive_ratio }}%</div>
+                    <div class="stat-label">Teigiamų</div>
+                </div>
+                {% endif %}
+
+                {% if game.price is not none %}
+                <div class="stat-block">
+                    <div class="stat-value stat-price">
+                        {% if game.price == 0 %}FREE{% else %}${{ "%.2f"|format(game.price) }}{% endif %}
+                    </div>
+                    <div class="stat-label">Kaina</div>
+                </div>
+                {% endif %}
+
+                {% if game.rating %}
+                <div class="stat-block">
+                    <div class="stat-value" style="font-size:1rem; color: var(--muted); padding-top:0.4rem;">{{ game.rating }}</div>
+                    <div class="stat-label">Reitingas</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aprašymas -->
+{% if game.about %}
+<div class="game-about">
+    <div class="section-title">APIE ŽAIDIMĄ</div>
+    <p class="about-text">{{ game.about }}</p>
+</div>
+{% endif %}
+
+<!-- SHAP -->
+{% if shap_explanation and shap_explanation.features %}
+<div class="shap-section">
+    <div class="section-title">🔍 KODĖL REKOMENDUOJAMAS</div>
+    {% if shap_png %}
+    <img src="/static/shap/{{ shap_png }}" class="shap-img" alt="SHAP">
+    {% endif %}
+    <div class="shap-features">
+        {% for f in shap_explanation.features[:6] %}
+        <span class="shap-feature {% if f.shap_value > 0 %}shap-pos{% else %}shap-neg{% endif %}">
+            {% if f.shap_value > 0 %}+{% endif %}{{ f.name }}
+            ({{ "%+.3f"|format(f.shap_value) }})
+        </span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- SVD Rekomendacijos -->
+{% if recommendations %}
+<div class="recs-section">
+    <div class="section-title">
+        🎯 SVD — Žaidėjai žaidė ir šiuos
+        <span class="model-badge badge-svd">Collaborative Filtering</span>
+    </div>
+    <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.8rem;">
+        Collaborative filtering pagal vartotojų elgseną + žanro boost
+    </p>
+    <div class="recs-grid">
+        {% for rec in recommendations %}
+        <a href="/game/{{ rec.app_id }}" class="rec-card">
+            {% if rec.header_image %}
+            <img src="{{ rec.header_image }}" class="rec-img" loading="lazy">
+            {% else %}
+            <div class="rec-img" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🎮</div>
+            {% endif %}
+            <div class="rec-info">
+                <div class="rec-title">{{ rec.title }}</div>
+                <div class="rec-score">{{ "%.3f"|format(rec.score) }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- NCF v28 Rekomendacijos -->
+{% if recommendations_ncf_v28 %}
+<div class="recs-section">
+    <div class="section-title" style="color: var(--accent3);">
+        ⚡ NCF v28 — Patobulintas neuroninis tinklas
+        <span class="model-badge badge-v28">F1: 0.9224</span>
+    </div>
+    <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.8rem;">
+        NCF su papildomais features: kaina, teigiamų %, žanrai (one-hot) — geriausias modelis iš 32 eksperimentų
+    </p>
+    <div class="recs-grid">
+        {% for rec in recommendations_ncf_v28 %}
+        <a href="/game/{{ rec.app_id }}" class="rec-card" style="border-color: rgba(167,139,250,0.2);">
+            {% if rec.header_image %}
+            <img src="{{ rec.header_image }}" class="rec-img" loading="lazy">
+            {% else %}
+            <div class="rec-img" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🎮</div>
+            {% endif %}
+            <div class="rec-info">
+                <div class="rec-title">{{ rec.title }}</div>
+                <div class="rec-score" style="color:var(--accent3);">{{ "%.3f"|format(rec.score) }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+</body>
+</html>

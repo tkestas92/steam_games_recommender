@@ -1,0 +1,86 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SISTEMINIAI FAILAI (Ypač svarbu tavo Mac'ui)
+# ─────────────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PYTHON IR VIRTUALI APLINKA
+# ─────────────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROJEKTO KONFIGŪRACIJA IR SAUGUMAS (SVARBU!)
+# ─────────────────────────────────────────────────────────────────────────────
+.env
+.envrc
+*.bak
+*.log
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DUOMENYS (SVARBU: Kad milžiniški CSV nekeliautų į GitHub)
+# ─────────────────────────────────────────────────────────────────────────────
+# Visi duomenų aplankai (jei naudoji data/ ar pan.)
+data/
+# Visi CSV failai bet kurioje vietoje
+*.csv
+# Jei turi SQL dump'us
+*.sql
+*.gz
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAŠININIS MOKYMASAS (ML) IR MODELIAI
+# ─────────────────────────────────────────────────────────────────────────────
+# FAISS indeksai
+*.index
+# NumPy masyvai
+*.npy
+# Ištreniruoti PyTorch/SVD modeliai
+*.pth
+*.pkl
+*.model
+*.weights
+# SHAP generuojami grafikai (jie turėtų būti generuojami dinamiškai)
+static/shap/*.png
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE (VS Code, PyCharm)
+# ─────────────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FLASK / WEB
+# ─────────────────────────────────────────────────────────────────────────────
+instance/
+.webassets-cache
