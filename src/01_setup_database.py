@@ -19,10 +19,20 @@ load_dotenv()
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Duomenų bazės URL suformuojamas dinamiškai iš aplinkos kintamųjų
-DB_URL = (
-    f"postgresql+psycopg2://{os.getenv('DB_USER')}@"
-    f"{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    # Railway / production: pilnas URL su slaptažodžiu
+    DB_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+else:
+    # Lokalus dev be slaptažodžio
+    DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DB_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+else:
+    DB_URL = (
+        f"postgresql+psycopg2://{os.getenv('DB_USER')}@"
+        f"{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+    )
 
 # Katalogai, kuriuose laikomi CSV failai ir modeliai
 DATA_DIR  = os.getenv("DATA_DIR")
@@ -257,14 +267,12 @@ def load_games():
 # USERS ĮKĖLIMAS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def load_users():
+def load_users(df_rec):
     """
     Filtruoja tik tuos vartotojus, kurie turi bent 50 rekomendacijų (aktyvūs vartotojai),
     ir įkelia juos į DB. Tai sumažina triukšmą rekomendacinėse sistemose.
     """
     print("📂 Filtruojame aktyvius vartotojus (50+ rekomendacijos)...")
-    # Pirmiausia nuskaitome rekomendacijas, kad sužinotume vartotojų aktyvumą
-    df_rec = pd.read_csv(f"{DATA_DIR}/recommendations3.csv", usecols=["user_id"])
     counts = df_rec["user_id"].value_counts()
     
     # Sukuriame aibę (set) su aktyviais vartotojais (skaičiavimo greičiui)
@@ -302,13 +310,12 @@ def load_users():
 # RECOMMENDATIONS ĮKĖLIMAS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def load_recommendations():
+def load_recommendations(df_rec):
     """
     Nuskaito atsiliepimus (rekomendacijas) ir išfiltruoja tas eilutes, kurios
     nurodo į neegzistuojančius žaidimus ar vartotojus (Foreign Key apsauga).
     """
-    print("📂 Skaitome recommendations3.csv...")
-    df = pd.read_csv(f"{DATA_DIR}/recommendations3.csv")
+    df = df_rec.copy()
     df.columns = df.columns.str.lower()
     df = df.drop_duplicates(subset="review_id")
     df["app_id"]  = pd.to_numeric(df["app_id"],  errors="coerce")
@@ -359,6 +366,8 @@ if __name__ == "__main__":
     print("🚀 Jungiamės prie PostgreSQL (SQLAlchemy 2.0)...")
     create_tables()
     load_games()
-    load_users()
-    load_recommendations()
+    print("📂 Skaitome recommendations3.csv (vieną kartą)...")
+    df_rec = pd.read_csv(f"{DATA_DIR}/recommendations3.csv")
+    load_users(df_rec)
+    load_recommendations(df_rec)
     print("\n✅ Viskas įkelta į DB!")
