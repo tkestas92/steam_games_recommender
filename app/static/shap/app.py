@@ -14,6 +14,11 @@ import uuid
 import pickle
 # MD5 maišos funkcijai: užklausų kešavimui
 import hashlib
+# Struktūrizuotas logging
+import logging
+# Laiko operacijos (failų cleanup)
+import time
+from pathlib import Path
 # Matematiniai skaičiavimai su masyvais: vektoriai, matricos
 import numpy as np
 # Duomenų lentelės: DataFrame operacijos
@@ -22,6 +27,7 @@ import pandas as pd
 import faiss
 # Flask komponentai: aplikacija, šablonai, užklausos, sesijos, JSON atsakymai
 from flask import Flask, render_template, request, session, jsonify
+from flask_cors import CORS
 # .env failo kintamųjų įkėlimas: DB slaptažodžiai, API raktai
 from dotenv import load_dotenv
 # SQLAlchemy: duomenų bazės ryšys ir SQL užklausos
@@ -53,6 +59,15 @@ import torch.nn as nn
 load_dotenv()
 
 # ─────────────────────────────────────────────────────────────────────────────
+# LOGGING SETUP
+# ─────────────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # KONFIGŪRACIJA
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -78,8 +93,14 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 engine = create_engine(DB_URL, echo=False)
 # Flask aplikacija
 app    = Flask(__name__)
-# Sesijos šifravimo raktas
-app.secret_key = os.getenv("SECRET_KEY", "steam-recommender-2025")
+# CORS palaikymas (Cross-Origin Resource Sharing)
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST"]}})
+# Sesijos šifravimo raktas - SAUGUS iš .env, ne hardcoded
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    logger.warning("⚠️ SECRET_KEY nenustatytas .env faile! Naudojamas atsitiktinis raktas (serverio restart → sesijos pasibaigia).")
+    SECRET_KEY = os.urandom(32).hex()
+app.secret_key = SECRET_KEY
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALŪS KINTAMIEJI — lazy loading (įkeliami tik kai reikia)
@@ -108,14 +129,19 @@ def get_faiss():
 # DUOMENŲ ĮKĖLIMAS — vykdomas vieną kartą paleidžiant serverį
 # ─────────────────────────────────────────────────────────────────────────────
 
-print("📂 Krauname duomenis...")
+logger.info("📂 Krauname duomenis...")
 # Nuskaitome žaidimų lentelę — reikalinga rekomendacijoms ir SHAP
-with engine.connect() as conn:
-    df_games = pd.read_sql("""
-        SELECT app_id, title, genres, tags, price_final,
-               positive_ratio, user_reviews, header_image
-        FROM games
-    """, conn)
+try:
+    with engine.connect() as conn:
+        df_games = pd.read_sql("""
+            SELECT app_id, title, genres, tags, price_final,
+                   positive_ratio, user_reviews, header_image
+            FROM games
+        """, conn)
+    logger.info(f"   ✅ {len(df_games)} žaidimų pakrauta")
+except Exception as e:
+    logger.error(f"   ❌ Duomenų krovimas nepavyko: {e}")
+    raise
 
 # SVD item faktoriai: kiekvienas žaidimas → latentinis vektorius
 svd_item_factors = np.load(os.path.join(MODEL_DIR, "svd_item_factors.npy"))
@@ -125,7 +151,6 @@ svd_game_ids     = list(np.load(os.path.join(MODEL_DIR, "game_ids.npy")))
 id_to_title      = dict(zip(df_games["app_id"], df_games["title"]))
 # Greita peržvalga: app_id → paveikslėlio URL
 id_to_header     = dict(zip(df_games["app_id"], df_games["header_image"].fillna("")))
-print(f"   ✅ {len(df_games)} žaidimų")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # NCF v28 MODELIS — Neural Collaborative Filtering su features   
@@ -212,7 +237,7 @@ def build_features(df):
     feats.append(np.log1p(df["user_reviews"].fillna(0)) / 15.0)
     return np.column_stack(feats)
 
-print("🤖 Treniruojame SHAP modelį...")
+logger.info("🤖 Treniruojame SHAP modelį...")
 # Features matrica visiems žaidimams
 X_all      = build_features(df_games)
 # Tikslas: ar žaidimas turi >=80% teigiamų
@@ -220,7 +245,7 @@ y_all      = (df_games["positive_ratio"].fillna(0) >= 80).astype(int)
 # Gradient Boosting: išmoksta kurie features lemia gerą žaidimą
 shap_model = GradientBoostingClassifier(n_estimators=100, random_state=42)
 shap_model.fit(X_all, y_all)
-print("   ✅ SHAP paruoštas")
+logger.info("   ✅ SHAP paruoštas")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GEMINI — AI paaiškinimai
@@ -228,11 +253,13 @@ print("   ✅ SHAP paruoštas")
 
 gemini_client = None
 try:
+    if not GEMINI_KEY:
+        raise ValueError("GEMINI_API_KEY nenustatytas .env faile")
     # Inicializuojame Gemini klientą
     gemini_client = genai.Client(api_key=GEMINI_KEY)
-    print("   ✅ Gemini paruoštas")
+    logger.info("   ✅ Gemini paruoštas")
 except Exception as e:
-    print(f"   ⚠️ Gemini: {e}")
+    logger.warning(f"   ⚠️ Gemini inicijalizacija nepavyko: {e}. RAG paaiškinimai bus išjungti.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REITINGŲ KONVERSIJA
@@ -257,39 +284,59 @@ RATING_SCORES = {
 def search(query: str, top_k: int = 10, mode: str = "balanced",
            w_sem: float = 0.8, w_ratio: float = 0.1,
            w_log: float = 0.1) -> list:
-    """Semantinė paieška su kešavimu ir keliais rikiavimo režimais."""
+    """Semantinė paieška su kešavimu ir keliais rikiavimo režimais. SQL injection protected."""
     import math
+    
+    # Input validation
+    if not query or len(query) > 200:
+        logger.warning(f"Netinkama paieškos užklausa: '{query}'")
+        return []
+    
+    top_k = max(1, min(50, int(top_k)))  # 1-50
+    w_sem = max(0, min(1, float(w_sem)))
+    w_ratio = max(0, min(1, float(w_ratio)))
+    w_log = max(0, min(1, float(w_log)))
+    
     # MD5 raktas kešavimui
     query_hash = hashlib.md5(f"{query}:{top_k}:{mode}:{w_sem}:{w_ratio}:{w_log}".encode()).hexdigest()
 
-    # Tikriname kešą
+    # Tikriname kešą - parameterized query
     with engine.connect() as conn:
         cached = conn.execute(
             text("SELECT result_json FROM search_cache WHERE query_hash = :h"),
             {"h": query_hash}
         ).fetchone()
     if cached:
+        logger.debug(f"Cache hit: {query_hash[:8]}...")
         return json.loads(cached[0])
 
     # Paverčiame užklausą į vektorių
-    model        = get_st_model()
-    index, aids  = get_faiss()
-    vec          = model.encode([query], convert_to_numpy=True).astype("float32")
-    # Normalizuojame (FAISS reikalavimas)
-    faiss.normalize_L2(vec)
-    # Ieškome artimiausių vektorių
-    distances, indices = index.search(vec, top_k * 3)
-    found_ids    = [int(aids[i]) for i in indices[0] if i != -1]
+    try:
+        model        = get_st_model()
+        index, aids  = get_faiss()
+        vec          = model.encode([query], convert_to_numpy=True).astype("float32")
+        # Normalizuojame (FAISS reikalavimas)
+        faiss.normalize_L2(vec)
+        # Ieškome artimiausių vektorių
+        distances, indices = index.search(vec, top_k * 3)
+        found_ids    = [int(aids[i]) for i in indices[0] if i != -1]
+    except Exception as e:
+        logger.error(f"FAISS paieška nepavyko: {e}")
+        return []
 
-    # Gauname žaidimų detales iš DB
-    with engine.connect() as conn:
-        ph   = ",".join(str(i) for i in found_ids)
-        rows = conn.execute(text(f"""
-            SELECT app_id, title, genres, tags, price_final,
-                   positive_ratio, rating, header_image, about_the_game,
-                   user_reviews
-            FROM games WHERE app_id IN ({ph})
-        """)).fetchall()
+    # Gauname žaidimų detales iš DB - PARAMETERIZED query
+    try:
+        with engine.connect() as conn:
+            # Pasigrindę placeholdersą - bet ji iš FAISS, turtu būti safe
+            rows = conn.execute(text("""
+                SELECT app_id, title, genres, tags, price_final,
+                       positive_ratio, rating, header_image, about_the_game,
+                       user_reviews
+                FROM games WHERE app_id = ANY(:ids)
+            """), {"ids": found_ids}).fetchall()
+    except Exception as e:
+        logger.error(f"DB užklausa nepavyko: {e}")
+        return []
 
     id_to_row = {r[0]: r for r in rows}
     results   = []
@@ -334,12 +381,15 @@ def search(query: str, top_k: int = 10, mode: str = "balanced",
     for i, r in enumerate(results):
         r["rank"] = i + 1
 
-    # Išsaugome į kešą
-    with engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO search_cache (query_hash, query_text, result_json)
-            VALUES (:h, :q, :r) ON CONFLICT (query_hash) DO NOTHING
-        """), {"h": query_hash, "q": query, "r": json.dumps(results, ensure_ascii=False)})
+    # Išsaugome į kešą - parameterized query
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO search_cache (query_hash, query_text, result_json)
+                VALUES (:h, :q, :r) ON CONFLICT (query_hash) DO NOTHING
+            """), {"h": query_hash, "q": query, "r": json.dumps(results, ensure_ascii=False)})
+    except Exception as e:
+        logger.warning(f"Cache save klaida (nekritiška): {e}")
 
     return results
 
@@ -464,85 +514,116 @@ def explain_game_fn(app_id: int) -> dict:
     }
 
 def plot_shap_fn(exp: dict) -> str:
-    """Generuoja SHAP grafiką ir išsaugo kaip PNG."""
+    """Generuoja SHAP grafiką ir išsaugo kaip PNG. Memory-safe su cleanup."""
     if not exp or not exp.get("features"):
         return ""
-    features = exp["features"]
-    names    = [f["name"] for f in features]
-    values   = [f["shap_value"] for f in features]
-    # Žalia = teigiama įtaka, raudona = neigiama
-    colors   = ["#4fffb0" if v > 0 else "#ff6b6b" for v in values]
-    fig, ax  = plt.subplots(figsize=(7, 4))
-    # Horizontalus stulpelinis grafikas
-    ax.barh(names[::-1], values[::-1], color=colors[::-1])
-    ax.axvline(0, color="#444", linewidth=0.8)
-    ax.set_xlabel("SHAP reikšmė", color="white")
-    ax.set_title(f"Kodėl: {exp['title'][:35]}", color="white")
-    # Tamsus fonas
-    ax.set_facecolor("#161922")
-    fig.patch.set_facecolor("#161922")
-    ax.tick_params(colors="white")
-    for s in ax.spines.values():
-        s.set_edgecolor("#2a2d3a")
-    plt.tight_layout()
-    # Išsaugome PNG failą
-    path = os.path.join(STATIC_DIR, f"shap_{exp['app_id']}.png")
-    plt.savefig(path, dpi=100, bbox_inches="tight", facecolor=fig.get_facecolor())
-    # Atlaisvinkame atmintį
-    plt.close()
-    return path
+    try:
+        features = exp["features"]
+        names    = [f["name"] for f in features]
+        values   = [f["shap_value"] for f in features]
+        # Žalia = teigiama įtaka, raudona = neigiama
+        colors   = ["#4fffb0" if v > 0 else "#ff6b6b" for v in values]
+        fig, ax  = plt.subplots(figsize=(7, 4))
+        # Horizontalus stulpelinis grafikas
+        ax.barh(names[::-1], values[::-1], color=colors[::-1])
+        ax.axvline(0, color="#444", linewidth=0.8)
+        ax.set_xlabel("SHAP reikšmė", color="white")
+        ax.set_title(f"Kodėl: {exp['title'][:35]}", color="white")
+        # Tamsus fonas
+        ax.set_facecolor("#161922")
+        fig.patch.set_facecolor("#161922")
+        ax.tick_params(colors="white")
+        for s in ax.spines.values():
+            s.set_edgecolor("#2a2d3a")
+        plt.tight_layout()
+        # Išsaugome PNG failą
+        path = os.path.join(STATIC_DIR, f"shap_{exp['app_id']}.png")
+        plt.savefig(path, dpi=100, bbox_inches="tight", facecolor=fig.get_facecolor())
+        return path
+    except Exception as e:
+        logger.error(f"SHAP grafikų generavimas klaida: {e}")
+        return ""
+    finally:
+        # SVARBU: Atlaisvinkame atmintį - plt.close('all') saugiau nei plt.close()
+        plt.close('all')
+        _cleanup_old_shap_files()
+
+def _cleanup_old_shap_files(days: int = 1) -> None:
+    """Ištrina senos SHAP PNG failai > N dienų. Prevencija memory leak."""
+    try:
+        now = time.time()
+        for f in Path(STATIC_DIR).glob("shap_*.png"):
+            if os.stat(f).st_mtime < now - (days * 86400):
+                os.remove(f)
+                logger.debug(f"Ištrinta sena SHAP PNG: {f}")
+    except Exception as e:
+        logger.debug(f"SHAP cleanup klaida (nekritiška): {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GEMINI RAG PAAIŠKINIMAS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def rag_explain_fn(query: str, top_k: int = 5) -> str:
-    """Gemini AI paaiškina paieškos rezultatus."""
+def rag_explain_fn(query: str, top_k: int = 5) -> dict:
+    """Gemini AI paaiškina paieškos rezultatus. Grąžina {'text': str, 'error': bool}."""
     if not gemini_client:
-        return ""
-    results    = search(query, top_k=top_k)
-    # Formuojame žaidimų sąrašą kaip tekstą
-    games_text = "".join(
-        f"{i+1}. {g['title']} (žanrai: {g['genres']}, {g['positive_ratio']}%, ${g['price'] or 0:.2f})\n"
-        for i, g in enumerate(results)
-    )
-    # Prompt'as Gemini modeliui
-    prompt = (
-        f'Tu esi žaidimų ekspertas. Vartotojas ieško: "{query}"\n\n'
-        f"Rasti žaidimai:\n{games_text}\n"
-        f"Paaiškink kodėl šie žaidimai tinka (2-3 sakiniai), išskirk geriausią.\n"
-        f"Atsakyk lietuviškai, glaustai (max 120 žodžių)."
-    )
+        return {"text": "", "error": True, "message": "Gemini API neinicijalizuotas"}
+    if not query or len(query.strip()) < 2:
+        return {"text": "", "error": True, "message": "Prašau įvesti galiojantį užklausą"}
     try:
+        results    = search(query, top_k=top_k)
+        if not results:
+            return {"text": "Nerasti žaidimai šiai užklausai", "error": False}
+        # Formuojame žaidimų sąrašą kaip tekstą
+        games_text = "".join(
+            f"{i+1}. {g['title']} (žanrai: {g['genres']}, {g['positive_ratio']}%, ${g['price'] or 0:.2f})\n"
+            for i, g in enumerate(results)
+        )
+        # Prompt'as Gemini modeliui
+        prompt = (
+            f'Tu esi žaidimų ekspertas. Vartotojas ieško: "{query}"\n\n'
+            f"Rasti žaidimai:\n{games_text}\n"
+            f"Paaiškink kodėl šie žaidimai tinka (2-3 sakiniai), išskirk geriausią.\n"
+            f"Atsakyk lietuviškai, glaustai (max 120 žodžių)."
+        )
         resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        return resp.text.strip()
+        return {"text": resp.text.strip(), "error": False}
     except Exception as e:
-        print(f"⚠️ Gemini: {e}")
-        return ""
+        logger.error(f"Gemini API klaida: {e}")
+        return {"text": "", "error": True, "message": f"Gemini API klaida: {str(e)[:100]}"}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RAKTINIŲ ŽODŽIŲ PAIEŠKA
 # ─────────────────────────────────────────────────────────────────────────────
 
 def search_keyword(query: str, top_k: int = 10) -> list:
-    """PostgreSQL ILIKE paieška pagal pavadinimą, žanrus, tags, aprašymą."""
-    with engine.connect() as conn:
-        rows = conn.execute(text("""
-            SELECT app_id, title, genres, tags, price_final,
-                   positive_ratio, rating, header_image, about_the_game,
-                   user_reviews,
-                   (
-                     CASE WHEN title ILIKE :q THEN 3.0 ELSE 0 END +
-                     CASE WHEN tags  ILIKE :q THEN 2.0 ELSE 0 END +
-                     CASE WHEN genres ILIKE :q THEN 1.5 ELSE 0 END +
-                     CASE WHEN about_the_game ILIKE :q THEN 1.0 ELSE 0 END
-                   ) AS kw_score
-            FROM games
-            WHERE title ILIKE :q OR tags ILIKE :q
-               OR genres ILIKE :q OR about_the_game ILIKE :q
-            ORDER BY kw_score DESC, user_reviews DESC NULLS LAST
-            LIMIT :k
-        """), {"q": f"%{query}%", "k": top_k}).fetchall()
+    """PostgreSQL ILIKE paieška pagal pavadinimą, žanrus, tags, aprašymą. SQL safe."""
+    # Input validation
+    if not query or len(query) > 200:
+        return []
+    top_k = max(1, min(50, int(top_k)))
+    
+    try:
+        with engine.connect() as conn:
+            # ILIKE 'protected' per parameterizuotą query
+            rows = conn.execute(text("""
+                SELECT app_id, title, genres, tags, price_final,
+                       positive_ratio, rating, header_image, about_the_game,
+                       user_reviews,
+                       (
+                         CASE WHEN title ILIKE :q THEN 3.0 ELSE 0 END +
+                         CASE WHEN tags  ILIKE :q THEN 2.0 ELSE 0 END +
+                         CASE WHEN genres ILIKE :q THEN 1.5 ELSE 0 END +
+                         CASE WHEN about_the_game ILIKE :q THEN 1.0 ELSE 0 END
+                       ) AS kw_score
+                FROM games
+                WHERE title ILIKE :q OR tags ILIKE :q
+                   OR genres ILIKE :q OR about_the_game ILIKE :q
+                ORDER BY kw_score DESC, user_reviews DESC NULLS LAST
+                LIMIT :k
+            """), {"q": f"%{query}%", "k": top_k}).fetchall()
+    except Exception as e:
+        logger.error(f"Keyword search klaida: {e}")
+        return []
 
     results = []
     for i, r in enumerate(rows):
@@ -651,19 +732,15 @@ def save_search(sid: str, query: str, results: list):
         """), {"sid": sid, "q": query, "r": json.dumps(results[:5], ensure_ascii=False)})
 
 def get_history(sid: str) -> list:
-    """Grąžina paskutines unikalias užklausas."""
+    """Grąžina paskutines unikalias užklausas. Optimizuota (O(n) vietoje O(n²))."""
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT query FROM search_history
             WHERE session_id = :sid
             ORDER BY created_at DESC LIMIT 20
         """), {"sid": sid}).fetchall()
-    # Filtruojame dublikatus
-    seen = []
-    for r in rows:
-        if r[0] not in seen:
-            seen.append(r[0])
-    return seen[:10]
+    # Filtruojame dublikatus - dict.fromkeys() yra O(n) ir grąžina unikias eilutes
+    return list(dict.fromkeys([r[0] for r in rows]))[:10]
 
 def get_sid():
     """Grąžina arba sukuria sesijos ID."""
@@ -683,20 +760,30 @@ def index():
 
 @app.route("/search")
 def search_route():
-    """Paieškos rezultatų puslapis."""
-    query = request.args.get("q", "").strip()
-    mode  = request.args.get("mode", "all")
-    sid   = get_sid()
-    if not query:
-        return render_template("index.html", error="Įveskite užklausą", history=[])
-
-    # Pasirinktiniai svoriai
-    w_sem   = float(request.args.get("w_sem",   0.8))
-    w_ratio = float(request.args.get("w_ratio", 0.1))
-    w_log   = float(request.args.get("w_log",   0.1))
-
-    # Visų 7 paieškos režimų rezultatai
-    all_results = {
+    """Paieškos rezultatų puslapis su input validation."""
+    try:
+        query = request.args.get("q", "").strip()
+        mode  = request.args.get("mode", "balanced")
+        sid   = get_sid()
+        
+        # Input validation
+        if not query or len(query) < 2 or len(query) > 200:
+            logger.warning(f"Netinkama paieškos užklausa: '{query}'")
+            return render_template("index.html", error="Užklausa turi būti 2-200 ženklų", history=[])
+        
+        if mode not in ["semantic", "keyword", "knn", "balanced", "popular", "logarithmic", "custom"]:
+            mode = "balanced"
+        
+        # Pasirinktiniai svoriai su validacija
+        try:
+            w_sem   = max(0, min(1, float(request.args.get("w_sem",   0.8))))
+            w_ratio = max(0, min(1, float(request.args.get("w_ratio", 0.1))))
+            w_log   = max(0, min(1, float(request.args.get("w_log",   0.1))))
+        except ValueError:
+            w_sem, w_ratio, w_log = 0.8, 0.1, 0.1
+        
+        # Visų 7 paieškos režimų rezultatai
+        all_results = {
         "keyword":     search_keyword(query, top_k=5),
         "knn":         search_knn(query, top_k=5),
         "balanced":    search(query, top_k=5, mode="balanced"),
@@ -707,65 +794,81 @@ def search_route():
                               w_sem=w_sem, w_ratio=w_ratio, w_log=w_log),
     }
 
-    # Išsaugome istoriją
-    save_search(sid, query, all_results["balanced"])
-
-    return render_template("index.html",
-                           query=query,
-                           all_results=all_results,
-                           results=all_results["balanced"],
-                           history=get_history(sid),
-                           mode=mode,
-                           w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
+        # Išsaugome istoriją
+        save_search(sid, query, all_results["balanced"])
+        
+        return render_template("index.html",
+                               query=query,
+                               all_results=all_results,
+                               results=all_results["balanced"],
+                               history=get_history(sid),
+                               mode=mode,
+                               w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
+    except Exception as e:
+        logger.error(f"Search route klaida: {e}")
+        return render_template("index.html", error="Paieškos klaida. Bandykite dar kartą.", history=[]), 500
 
 
 @app.route("/api/explain")
 def api_explain():
-    """API: Gemini paaiškinimas."""
-    query = request.args.get("q", "").strip()
-    if not query:
-        return jsonify({"explanation": ""})
-    explanation = rag_explain_fn(query)
-    return jsonify({"explanation": explanation})
+    """API: Gemini paaiškinimas su error handling."""
+    try:
+        query = request.args.get("q", "").strip()
+        if not query or len(query) < 2 or len(query) > 200:
+            return jsonify({"explanation": "", "error": True, "message": "Netinkama užklausa (2-200 ženklai)"}), 400
+        result = rag_explain_fn(query)
+        return jsonify(result), 200 if not result.get("error") else 503
+    except Exception as e:
+        logger.error(f"API /explain klaida: {e}")
+        return jsonify({"explanation": "", "error": True, "message": "Serverio klaida"}), 500
 
 
 @app.route("/game/<int:app_id>")
 def game_detail(app_id):
-    """Žaidimo detalių puslapis."""
-    # Gauname žaidimo informaciją
-    with engine.connect() as conn:
-        row = conn.execute(text("""
-            SELECT app_id, title, genres, tags, about_the_game,
-                   price_final, positive_ratio, rating, header_image
-            FROM games WHERE app_id = :id
-        """), {"id": app_id}).fetchone()
-    if not row:
-        return "Žaidimas nerastas", 404
+    """Žaidimo detalių puslapis su error handling."""
+    try:
+        # Validacija
+        if app_id <= 0 or app_id > 2147483647:  # int32 max
+            return "Netinkamas žaidimo ID", 400
+        
+        # Gauname žaidimo informaciją - parameterized query
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT app_id, title, genres, tags, about_the_game,
+                       price_final, positive_ratio, rating, header_image
+                FROM games WHERE app_id = :id
+            """), {"id": app_id}).fetchone()
+        if not row:
+            logger.warning(f"Žaidimas nerastas: {app_id}")
+            return "Žaidimas nerastas", 404
 
-    game = {
+        game = {
         "app_id": row[0], "title": row[1], "genres": row[2], "tags": row[3],
         "about": row[4], "price": row[5], "positive_ratio": row[6],
         "rating": row[7], "header_image": row[8]
     }
 
-    # SVD rekomendacijos (collaborative filtering)
-    recs_svd     = recommend_svd_fn(app_id)
-    # NCF v28 rekomendacijos (neuroninis tinklas)
-    recs_ncf_v28 = recommend_ncf_v28_fn(app_id)
-    # SHAP paaiškinimas
-    exp          = explain_game_fn(app_id)
-    shap_png     = None
-    if exp:
-        path = plot_shap_fn(exp)
-        if path:
-            shap_png = os.path.basename(path)
+        # SVD rekomendacijos (collaborative filtering)
+        recs_svd     = recommend_svd_fn(app_id)
+        # NCF v28 rekomendacijos (neuroninis tinklas)
+        recs_ncf_v28 = recommend_ncf_v28_fn(app_id)
+        # SHAP paaiškinimas
+        exp          = explain_game_fn(app_id)
+        shap_png     = None
+        if exp:
+            path = plot_shap_fn(exp)
+            if path:
+                shap_png = os.path.basename(path)
 
-    return render_template("game.html",
-                           game=game,
-                           recommendations=recs_svd,
-                           recommendations_ncf_v28=recs_ncf_v28,
-                           shap_explanation=exp,
-                           shap_png=shap_png)
+        return render_template("game.html",
+                               game=game,
+                               recommendations=recs_svd,
+                               recommendations_ncf_v28=recs_ncf_v28,
+                               shap_explanation=exp,
+                               shap_png=shap_png)
+    except Exception as e:
+        logger.error(f"Game detail klaida ({app_id}): {e}")
+        return "Klaida kraunant žaidimą", 500
 
 
 @app.route("/compare")
@@ -820,20 +923,35 @@ def profile():
 
 @app.route("/api/search")
 def api_search():
-    """API: paieška JSON formatu."""
-    query = request.args.get("q", "").strip()
-    if not query:
-        return jsonify({"error": "Query required"}), 400
-    return jsonify(search(query, top_k=int(request.args.get("top_k", 10))))
+    """API: paieška JSON formatu su input validation."""
+    try:
+        query = request.args.get("q", "").strip()
+        if not query or len(query) < 2 or len(query) > 200:
+            return jsonify({"error": "Query turi būti 2-200 ženklų", "results": []}), 400
+        
+        try:
+            top_k = max(1, min(50, int(request.args.get("top_k", 10))))
+        except ValueError:
+            top_k = 10
+        
+        return jsonify({"results": search(query, top_k=top_k), "error": None}), 200
+    except Exception as e:
+        logger.error(f"API /search klaida: {e}")
+        return jsonify({"error": "Serverio klaida", "results": []}), 500
 
 
 @app.route("/api/clear_history", methods=["POST"])
 def clear_history():
-    """API: išvalo paieškos istoriją."""
-    sid = get_sid()
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM search_history WHERE session_id = :sid"), {"sid": sid})
-    return jsonify({"ok": True})
+    """API: išvalo paieškos istoriją su error handling."""
+    try:
+        sid = get_sid()
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM search_history WHERE session_id = :sid"), {"sid": sid})
+        logger.info(f"Valyti sesijos istorija: {sid}")
+        return jsonify({"ok": True, "message": "Istorija išvala"}), 200
+    except Exception as e:
+        logger.error(f"Clear history klaida: {e}")
+        return jsonify({"ok": False, "error": "Serverio klaida"}), 500
 
 
 # Paleidžiame serverį jei failas vykdomas tiesiogiai
