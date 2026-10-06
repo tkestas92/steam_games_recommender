@@ -131,6 +131,103 @@
             background: rgba(79,255,176,0.05);
         }
 
+        /* ── Režimo pasirinkimas ── */
+        .mode-picker {
+            display: flex; flex-wrap: wrap; gap: 0.4rem;
+            justify-content: center; margin-top: 1.2rem;
+        }
+        .mode-pill {
+            position: relative;
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            font-size: 0.75rem; font-weight: 500; color: var(--muted);
+            border: 1px solid var(--border); border-radius: 3px;
+            padding: 0.4rem 0.7rem; cursor: pointer;
+            transition: all 0.15s; background: var(--surface);
+        }
+        .mode-pill input { position: absolute; opacity: 0; pointer-events: none; }
+        .mode-pill:hover { border-color: var(--accent); color: var(--text); }
+        .mode-pill.active {
+            border-color: var(--accent); color: var(--accent);
+            background: rgba(79,255,176,0.08);
+        }
+        .mode-desc {
+            text-align: center; font-size: 0.78rem; color: var(--muted);
+            margin-top: 0.7rem; min-height: 1.2rem;
+        }
+
+        .custom-sliders-inline {
+            max-width: 420px; margin: 1rem auto 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 4px; padding: 0.9rem 1.1rem;
+        }
+        .custom-sliders-inline .slider-row {
+            display: flex; align-items: center; gap: 0.6rem;
+            margin-bottom: 0.55rem; font-size: 0.75rem;
+        }
+        .custom-sliders-inline .slider-row:last-of-type { margin-bottom: 0.3rem; }
+        .custom-sliders-inline .slider-label { min-width: 90px; color: var(--muted); text-align: left; }
+        .custom-sliders-inline .slider-input { flex: 1; height: 3px; cursor: pointer; accent-color: #ff9f43; }
+        .custom-sliders-inline .slider-value { min-width: 34px; text-align: right; color: #ff9f43; font-weight: 600; font-size: 0.72rem; }
+        .custom-sliders-inline .custom-total { font-size: 0.68rem; color: var(--muted); text-align: right; }
+        .custom-sliders-inline .custom-total.over { color: #ff6b6b; }
+
+        .compare-toggle {
+            display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+            margin-top: 1rem; font-size: 0.75rem; color: var(--muted); cursor: pointer;
+        }
+        .compare-toggle input { accent-color: var(--accent); cursor: pointer; }
+        .compare-toggle:hover { color: var(--text); }
+
+        /* ── Vieno režimo rezultatų tinklelis ── */
+        .results-section {
+            max-width: 1400px; margin: 2.5rem auto;
+            padding: 0 1.5rem; position: relative; z-index: 1;
+        }
+        .results-header {
+            display: flex; align-items: baseline; gap: 1rem;
+            margin-bottom: 1.2rem;
+            border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;
+        }
+        .results-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 0.05em;
+        }
+        .results-subtitle { font-size: 0.8rem; color: var(--muted); }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+        }
+        @media (max-width: 1100px) { .results-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 700px)  { .results-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .result-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border); border-radius: 4px;
+            text-decoration: none; color: inherit;
+            overflow: hidden; transition: border-color 0.15s, transform 0.15s;
+            display: flex; flex-direction: column;
+        }
+        .result-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .result-img { width: 100%; height: 84px; object-fit: cover; display: block; background: var(--border); }
+        .result-img-placeholder {
+            width: 100%; height: 84px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; background: var(--border);
+        }
+        .result-info { padding: 0.6rem 0.8rem; flex: 1; }
+        .result-rank { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; color: var(--muted); }
+        .result-title {
+            font-size: 0.8rem; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin: 0.15rem 0 0.3rem;
+        }
+        .result-meta { display: flex; align-items: center; gap: 0.4rem; }
+        .result-breakdown {
+            font-size: 0.62rem; color: var(--muted); margin-top: 0.35rem;
+            letter-spacing: 0.02em;
+        }
+
         /* ── RAG ── */
         .explanation-block {
             max-width: 900px; margin: 2rem auto 0;
@@ -422,6 +519,44 @@
             <button class="suggestion-chip" onclick="setQuery('multiplayer shooter sci-fi')">sci-fi shooter</button>
             <button class="suggestion-chip" onclick="setQuery('indie puzzle platformer')">indie puzzle</button>
         </div>
+
+        <div class="mode-picker" id="modePicker">
+            <label class="mode-pill" data-mode="balanced"><input type="radio" name="mode" value="balanced" form="searchForm" {% if not mode or mode=='balanced' %}checked{% endif %}>⚖️ Subalansuotas</label>
+            <label class="mode-pill" data-mode="semantic"><input type="radio" name="mode" value="semantic" form="searchForm" {% if mode=='semantic' %}checked{% endif %}>🧠 Semantinis</label>
+            <label class="mode-pill" data-mode="popular"><input type="radio" name="mode" value="popular" form="searchForm" {% if mode=='popular' %}checked{% endif %}>🔥 Populiarus</label>
+            <label class="mode-pill" data-mode="logarithmic"><input type="radio" name="mode" value="logarithmic" form="searchForm" {% if mode=='logarithmic' %}checked{% endif %}>📊 Logaritminis</label>
+            <label class="mode-pill" data-mode="keyword"><input type="radio" name="mode" value="keyword" form="searchForm" {% if mode=='keyword' %}checked{% endif %}>🔤 Raktažodis</label>
+            <label class="mode-pill" data-mode="knn"><input type="radio" name="mode" value="knn" form="searchForm" {% if mode=='knn' %}checked{% endif %}>📍 KNN</label>
+            <label class="mode-pill" data-mode="custom"><input type="radio" name="mode" value="custom" form="searchForm" {% if mode=='custom' %}checked{% endif %}>🎛️ Custom</label>
+        </div>
+        <div class="mode-desc" id="modeDesc"></div>
+
+        <div class="custom-sliders-inline" id="customSlidersInline" style="display:none;">
+            <div class="slider-row">
+                <span class="slider-label">Semantika</span>
+                <input type="range" class="slider-input" name="w_sem" form="searchForm" id="sl_sem" min="0" max="1" step="0.01"
+                       value="{{ w_sem or 0.8 }}" oninput="updateCustom()">
+                <span class="slider-value" id="v_sem">{{ ((w_sem or 0.8) * 100) | int }}%</span>
+            </div>
+            <div class="slider-row">
+                <span class="slider-label">Reitingas %</span>
+                <input type="range" class="slider-input" name="w_ratio" form="searchForm" id="sl_ratio" min="0" max="1" step="0.01"
+                       value="{{ w_ratio or 0.1 }}" oninput="updateCustom()">
+                <span class="slider-value" id="v_ratio">{{ ((w_ratio or 0.1) * 100) | int }}%</span>
+            </div>
+            <div class="slider-row">
+                <span class="slider-label">Apžvalgos</span>
+                <input type="range" class="slider-input" name="w_log" form="searchForm" id="sl_log" min="0" max="1" step="0.01"
+                       value="{{ w_log or 0.1 }}" oninput="updateCustom()">
+                <span class="slider-value" id="v_log">{{ ((w_log or 0.1) * 100) | int }}%</span>
+            </div>
+            <div class="custom-total" id="customTotal">Suma: 100%</div>
+        </div>
+
+        <label class="compare-toggle">
+            <input type="checkbox" name="compare" value="1" form="searchForm" id="compareToggle" {% if compare %}checked{% endif %}>
+            Palyginti visus 7 režimus vienu metu
+        </label>
     </div>
 </section>
 
@@ -449,11 +584,11 @@
 </div>
 {% endif %}
 
-{% if all_results %}
+{% if compare and all_results %}
 <section class="compare-section">
     <div class="compare-header">
         <span class="compare-title">Rezultatai</span>
-        <span class="compare-subtitle">„{{ query }}" · 4 rikiavimo režimai palyginimui</span>
+        <span class="compare-subtitle">„{{ query }}" · 7 rikiavimo režimai palyginimui</span>
     </div>
 
     <div class="compare-grid">
@@ -704,38 +839,54 @@
                 Ieškokite kad pamatytumėte rezultatus
             </div>
             {% endif %}
-
-            <div class="custom-sliders">
-                <div class="slider-row">
-                    <span class="slider-label">Semantika</span>
-                    <input type="range" class="slider-input" id="sl_sem" min="0" max="100"
-                           value="{{ ((w_sem or 0.8) * 100) | int }}" oninput="updateCustom()">
-                    <span class="slider-value" id="v_sem">{{ ((w_sem or 0.8) * 100) | int }}%</span>
-                </div>
-                <div class="slider-row">
-                    <span class="slider-label">Reitingas %</span>
-                    <input type="range" class="slider-input" id="sl_ratio" min="0" max="100"
-                           value="{{ ((w_ratio or 0.1) * 100) | int }}" oninput="updateCustom()">
-                    <span class="slider-value" id="v_ratio">{{ ((w_ratio or 0.1) * 100) | int }}%</span>
-                </div>
-                <div class="slider-row">
-                    <span class="slider-label">Apžvalgos</span>
-                    <input type="range" class="slider-input" id="sl_log" min="0" max="100"
-                           value="{{ ((w_log or 0.1) * 100) | int }}" oninput="updateCustom()">
-                    <span class="slider-value" id="v_log">{{ ((w_log or 0.1) * 100) | int }}%</span>
-                </div>
-                <div class="custom-total" id="customTotal">Suma: 100%</div>
-                <button onclick="applyCustom()" style="
-                    width:100%; margin-top:0.6rem; padding:0.4rem;
-                    background: rgba(255,159,67,0.15); border: 1px solid #ff9f43;
-                    color: #ff9f43; border-radius:2px; cursor:pointer;
-                    font-family:'DM Sans',sans-serif; font-size:0.72rem; font-weight:600;
-                    letter-spacing:0.05em;
-                ">TAIKYTI →</button>
+            <div style="padding:0.6rem 1rem; color: var(--muted); font-size:0.68rem; text-align:center; border-top: 1px solid var(--border);">
+                Svoriai koreguojami slankikliais virš paieškos laukelio
             </div>
         </div>
 
     </div>
+</section>
+{% endif %}
+
+{% if not compare and results %}
+<section class="results-section">
+    <div class="results-header">
+        <span class="results-title">Rezultatai</span>
+        <span class="results-subtitle">„{{ query }}“ · režimas: {{ mode }}</span>
+    </div>
+    <div class="results-grid">
+        {% for game in results %}
+        <a href="/game/{{ game.app_id }}" class="result-card">
+            {% if game.header_image %}
+            <img src="{{ game.header_image }}" class="result-img" loading="lazy">
+            {% else %}
+            <div class="result-img-placeholder">🎮</div>
+            {% endif %}
+            <div class="result-info">
+                <span class="result-rank">#{{ game.rank }}</span>
+                <div class="result-title">{{ game.title }}</div>
+                <div class="result-meta">
+                    {% if game.positive_ratio %}
+                        {% if game.positive_ratio >= 80 %}
+                        <span class="mini-rating rating-positive">{{ game.positive_ratio }}%</span>
+                        {% elif game.positive_ratio >= 60 %}
+                        <span class="mini-rating rating-mixed">{{ game.positive_ratio }}%</span>
+                        {% else %}
+                        <span class="mini-rating rating-negative">{{ game.positive_ratio }}%</span>
+                        {% endif %}
+                    {% endif %}
+                    <span class="mini-score">{{ "%.2f"|format(game.score) }}</span>
+                </div>
+                {% if game.sem_score is defined %}
+                <div class="result-breakdown">sem {{ game.sem_score }} · pop {{ game.pop_score }} · rev {{ game.rev_score }}</div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% if not results %}
+    <div style="padding:2rem; color:var(--muted); text-align:center;">Nieko nerasta.</div>
+    {% endif %}
 </section>
 {% endif %}
 
@@ -794,28 +945,53 @@ function setQuery(text) {
 }
 
 function updateCustom() {
-    const sem   = parseInt(document.getElementById('sl_sem').value);
-    const ratio = parseInt(document.getElementById('sl_ratio').value);
-    const log   = parseInt(document.getElementById('sl_log').value);
+    const sem   = parseFloat(document.getElementById('sl_sem').value);
+    const ratio = parseFloat(document.getElementById('sl_ratio').value);
+    const log   = parseFloat(document.getElementById('sl_log').value);
 
-    document.getElementById('v_sem').textContent   = sem + '%';
-    document.getElementById('v_ratio').textContent = ratio + '%';
-    document.getElementById('v_log').textContent   = log + '%';
+    document.getElementById('v_sem').textContent   = Math.round(sem * 100)   + '%';
+    document.getElementById('v_ratio').textContent = Math.round(ratio * 100) + '%';
+    document.getElementById('v_log').textContent   = Math.round(log * 100)   + '%';
 
-    const total = sem + ratio + log;
+    const total = Math.round((sem + ratio + log) * 100);
     const el = document.getElementById('customTotal');
     el.textContent = `Suma: ${total}%`;
     el.className = 'custom-total' + (total !== 100 ? ' over' : '');
 }
 
-function applyCustom() {
-    const q     = document.getElementById('searchInput').value.trim();
-    const sem   = parseInt(document.getElementById('sl_sem').value) / 100;
-    const ratio = parseInt(document.getElementById('sl_ratio').value) / 100;
-    const log   = parseInt(document.getElementById('sl_log').value) / 100;
-    if (!q) return;
-    window.location.href = `/search?q=${encodeURIComponent(q)}&mode=custom&w_sem=${sem}&w_ratio=${ratio}&w_log=${log}`;
+// Režimo aprašymai — rodomi po pasirinkimo, kad vartotojas žinotų ką renkasi
+// prieš paspausdamas "Ieškoti".
+const MODE_DESCRIPTIONS = {
+    balanced:    "Prasmė 80% + reitingas 20%. Rekomenduojamas numatytasis režimas.",
+    semantic:    "Grynas AI panašumas pagal prasmę — reitingai neturi įtakos.",
+    popular:     "Prasmė 60% + reitingas 40% — aukščiau kyla gerai įvertinti žaidimai.",
+    logarithmic: "Prasmė 80% + apžvalgų kiekis 10% + reitingas 10% — mažina outlierių įtaką.",
+    keyword:     "Tikslus žodžių sutapimas pavadinime, žanruose ir apraše.",
+    knn:         "Panašumas pagal žodžius (TF-IDF) — greitesnis, bet nesupranta prasmės.",
+    custom:      "Pats nustatai svorius slankikliais žemiau."
+};
+
+function refreshModePicker() {
+    const checked = document.querySelector('input[name="mode"]:checked');
+    const mode = checked ? checked.value : 'balanced';
+
+    document.querySelectorAll('.mode-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.mode === mode);
+    });
+
+    const descEl = document.getElementById('modeDesc');
+    if (descEl) descEl.textContent = MODE_DESCRIPTIONS[mode] || '';
+
+    const slidersEl = document.getElementById('customSlidersInline');
+    if (slidersEl) slidersEl.style.display = (mode === 'custom') ? 'block' : 'none';
 }
+
+document.querySelectorAll('input[name="mode"]').forEach(input => {
+    input.addEventListener('change', refreshModePicker);
+});
+
+updateCustom();
+refreshModePicker();
 </script>
 
 </body>

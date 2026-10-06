@@ -1,0 +1,57 @@
+{
+  "generated": "2026-10-06",
+  "dataset": {
+    "users": 37101,
+    "games": 668,
+    "interactions": 1424237,
+    "train": 1139389,
+    "test": 284848,
+    "positive_rate": 0.8451,
+    "user_min_reviews": 50,
+    "game_min_reviews": 1000
+  },
+  "classification": [
+    {
+      "model": "Visada „rekomenduoja“",
+      "accuracy": 0.8451,
+      "f1": 0.916,
+      "auc": 0.5
+    },
+    {
+      "model": "Žaidimo vidutinis įvertinimas",
+      "accuracy": 0.846,
+      "f1": 0.9162,
+      "auc": 0.7015
+    },
+    {
+      "model": "NCF v28",
+      "accuracy": 0.8605,
+      "f1": 0.922,
+      "auc": 0.821
+    }
+  ],
+  "ranking": {
+    "k": 10,
+    "eval_users": 3000,
+    "models": [
+      {
+        "model": "Populiariausi žaidimai",
+        "recall": 0.0608,
+        "ndcg": 0.0586,
+        "hit": 0.3263
+      },
+      {
+        "model": "SVD (panašūs žaidimai)",
+        "recall": 0.1015,
+        "ndcg": 0.0944,
+        "hit": 0.4263
+      },
+      {
+        "model": "NCF v28",
+        "recall": 0.0272,
+        "ndcg": 0.0253,
+        "hit": 0.156
+      }
+    ]
+  }
+}

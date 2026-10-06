@@ -6,8 +6,7 @@
     <title>Modelių palyginimas · GameFinder</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-    <style>
+        <style>
         :root {
             --bg:      #0d0f14;
             --surface: #161922;
@@ -236,6 +235,44 @@
             font-size: 0.72rem; border-top: 1px solid var(--border);
             position: relative; z-index: 1;
         }
+    
+        /* ── Naujas puslapis ── */
+        .models-grid.three { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 900px) { .models-grid.three { grid-template-columns: 1fr; } }
+        .model-card.search { border-left-color: var(--yellow); }
+        .model-card.search .model-name { color: var(--yellow); }
+        .task-line {
+            font-size: 0.78rem; color: var(--accent2); margin-bottom: 0.7rem;
+            letter-spacing: 0.02em;
+        }
+        .sub-title {
+            font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem;
+            letter-spacing: 0.06em; margin: 1.8rem 0 0.4rem;
+        }
+        .sub-note { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.8rem; line-height: 1.6; }
+        .eval-table { width: 100%; border-collapse: collapse; background: var(--card-bg);
+            border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .eval-table th { text-align: left; font-size: 0.68rem; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--muted); padding: 0.7rem 1rem;
+            border-bottom: 1px solid var(--border); font-weight: 500; }
+        .eval-table td { padding: 0.75rem 1rem; font-size: 0.85rem;
+            border-bottom: 1px solid var(--border); }
+        .eval-table tr:last-child td { border-bottom: none; }
+        .eval-table .num { font-variant-numeric: tabular-nums; }
+        .eval-table .best { color: var(--accent); font-weight: 600; }
+        .bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 5px; max-width: 120px; }
+        .bar > span { display: block; height: 100%; background: var(--accent2); border-radius: 2px; }
+        .bar.best-bar > span { background: var(--accent); }
+        .ds-line { font-size: 0.74rem; color: var(--muted); margin-top: 0.8rem; line-height: 1.7; }
+        .insights { margin-top: 1.2rem; }
+        .insights p { font-size: 0.85rem; line-height: 1.7; margin-bottom: 0.7rem; }
+        .limits { list-style: none; margin-bottom: 2.5rem; }
+        .limits li { font-size: 0.85rem; line-height: 1.7; color: var(--text);
+            padding: 0.55rem 0 0.55rem 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+        .limits li:last-child { border-bottom: none; }
+        .limits li::before { content: "–"; position: absolute; left: 0; color: var(--muted); }
+        .pending { text-align: center; color: var(--muted); padding: 2rem; font-size: 0.85rem;
+            border: 1px dashed var(--border); border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -249,136 +286,165 @@
 </nav>
 
 <div class="page-hero">
-    <div class="hero-tag">ML · Collaborative Filtering</div>
+    <div class="hero-tag">ML · Paieška · Rekomendacijos</div>
     <h1 class="page-title">Modelių palyginimas</h1>
-    <p class="page-subtitle">SVD vs NCF — du rekomendacijų algoritmai</p>
+    <p class="page-subtitle">Trys sistemos, trys skirtingi uždaviniai – ir kaip juos teisingai palyginti</p>
 </div>
 
 <div class="content">
 
-    <!-- Modelių aprašymai -->
-    <div class="section-title">MODELIAI</div>
-    <div class="models-grid">
+    <div class="section-title">KAIP VEIKIA SISTEMA</div>
+    <div class="models-grid three">
+        <div class="model-card search">
+            <div class="model-name">SEMANTINĖ PAIEŠKA</div>
+            <p class="task-line">Klausimas: „kuris žaidimas atitinka mano aprašymą?“</p>
+            <p class="model-desc">
+                Žaidimų aprašymai paverčiami vektoriais (all-mpnet-base-v2) ir ieškomi FAISS indekse.
+                Rezultatų tvarką galima keisti 7 režimais: nuo grynai „pagal prasmę“ iki
+                prasmės, reitingo ir apžvalgų kiekio mišinio.
+            </p>
+            <div class="model-tech">
+                <span class="tech-tag">mpnet</span>
+                <span class="tech-tag">FAISS</span>
+                <span class="tech-tag">7 režimai</span>
+                <span class="tech-tag">Gemini paaiškinimas</span>
+            </div>
+        </div>
+
         <div class="model-card svd">
             <div class="model-name">SVD</div>
+            <p class="task-line">Klausimas: „kokie žaidimai panašūs į šiuos?“</p>
             <p class="model-desc">
-                Truncated Singular Value Decomposition — matricos faktorizacijos metodas.
-                User-Item matricą skaido į latentinius faktorius (50 komponentų).
-                Kiekvienas žaidimas ir vartotojas gauna 50d vektorių, reprezentuojantį
-                paslėptus interesus. Rekomendacijos skaičiuojamos pagal kosinusinį panašumą
-                tarp žaidimų vektorių.
+                Vartotojų ir žaidimų matrica (svoris – log(1+valandos)) suspaudžiama į 50 paslėptų
+                faktorių. Žaidimai, kuriuos žaidžia tie patys žmonės, atsiduria arti vienas kito.
+                Naudojamas žaidimo puslapyje „Panašūs žaidimai“.
             </p>
             <div class="model-tech">
                 <span class="tech-tag">TruncatedSVD</span>
-                <span class="tech-tag">scipy sparse</span>
-                <span class="tech-tag">log(1+hours)</span>
-                <span class="tech-tag">žanro boost +20%</span>
                 <span class="tech-tag">50 komponentų</span>
+                <span class="tech-tag">kosinusinis panašumas</span>
             </div>
         </div>
 
         <div class="model-card ncf">
-            <div class="model-name">NCF</div>
+            <div class="model-name">NCF v28</div>
+            <p class="task-line">Klausimas: „ar šis žmogus rekomenduos šį žaidimą?“</p>
             <p class="model-desc">
-                Neural Collaborative Filtering — gilus neuroninis tinklas.
-                Vartotojas ir žaidimas koduojami į 64d embeddings, sujungiami
-                ir perduodami per MLP su 3 sluoksniais. Modelis mokosi
-                sudėtingų nelinijinių priklausomybių tarp vartotojų ir žaidimų.
-                Treniruotas 20 epochų su BCELoss.
+                Neuroninis tinklas: vartotojo ir žaidimo 64d vektoriai kartu su kaina, reitingu ir žanrais
+                eina per 3 sluoksnių MLP. Išbandyta 32 versijos; v28 mokyta 15 epochų (BCELoss).
+                Dengia apie 670 populiariausių žaidimų. Prognozes paaiškina SHAP.
             </p>
             <div class="model-tech">
                 <span class="tech-tag">PyTorch</span>
                 <span class="tech-tag">Embedding 64d</span>
-                <span class="tech-tag">MLP 3 sluoksniai</span>
-                <span class="tech-tag">BCELoss</span>
-                <span class="tech-tag">Adam optimizer</span>
+                <span class="tech-tag">MLP</span>
+                <span class="tech-tag">SHAP</span>
             </div>
         </div>
     </div>
 
-    <!-- Metrikos -->
-    <div class="section-title">METRIKOS — Precision@10 ir Recall@10</div>
-
-    {% if metrics %}
-    <table class="metrics-table">
-        <thead>
-            <tr>
-                <th>Modelis</th>
-                <th>Precision@10</th>
-                <th>Recall@10</th>
-                <th>Data</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in metrics %}
-            <tr>
-                <td>
-                    <span class="model-badge {% if m.model == 'svd' %}badge-svd{% else %}badge-ncf{% endif %}">
-                        {{ m.model | upper }}
-                    </span>
-                </td>
-                <td>
-                    <span class="metric-value {% if m.precision >= 0.3 %}metric-good{% elif m.precision >= 0.1 %}metric-ok{% else %}metric-bad{% endif %}">
-                        {{ "%.4f" | format(m.precision) }}
-                    </span>
-                </td>
-                <td>
-                    <span class="metric-value {% if m.recall >= 0.3 %}metric-good{% elif m.recall >= 0.1 %}metric-ok{% else %}metric-bad{% endif %}">
-                        {{ "%.4f" | format(m.recall) }}
-                    </span>
-                </td>
-                <td style="color: var(--muted); font-size: 0.75rem;">{{ m.date }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Grafikas -->
-    <div class="section-title">VIZUALIZACIJA</div>
-    <div class="chart-wrap">
-        <canvas id="metricsChart" class="chart-canvas"></canvas>
-    </div>
-
-    {% else %}
-    <div style="text-align:center; color: var(--muted); padding: 2rem;">
-        Metrikos dar neskaičiuotos. Paleisk <code>src/04_recommend.py</code>.
-    </div>
-    {% endif %}
-
-    <!-- Paaiškinimas -->
     <div class="explanation-block">
-        <div class="explanation-label">📊 Kaip interpretuoti</div>
+        <div class="explanation-label">⚖️ Kodėl nėra vieno „geriausio modelio“</div>
         <p class="explanation-text">
-            <strong>Precision@10</strong> — iš 10 rekomenduotų žaidimų, kiek procentų iš tikrųjų tinka vartotojui.
-            Pvz. 0.30 reiškia kad 3 iš 10 rekomendacijų yra tinkamos.<br><br>
-            <strong>Recall@10</strong> — kiek procentų visų tinkamų žaidimų pavyko rasti tarp 10 rekomendacijų.
-            Mažas Recall@10 normalus — sunku rasti visus tinkamus žaidimus iš tūkstančių.<br><br>
-            <strong>SVD</strong> paprastai geresnis kai duomenys reti (sparse), nes nereikalauja daug treniravimo.
-            <strong>NCF</strong> gali būti geresnis su tankiais duomenimis ir sudėtingomis priklausomybėmis.
+            SVD ir NCF atsako į skirtingus klausimus, todėl vienu skaičiumi jų lyginti negalima.
+            Todėl žemiau kiekvienas vertinamas dviem būdais, visada ant tos pačios test aibės,
+            kurios modeliai treniravimo metu nematė, ir kartu su paprastais baseline'ais –
+            be jų skaičius neturi atskaitos taško.
         </p>
     </div>
 
-    <!-- Metrikos apibrėžimai -->
-    <div class="section-title">APIBRĖŽIMAI</div>
+    <div class="section-title">REZULTATAI</div>
+
+    {% if ev %}
+
+    <div class="sub-title">A) Ar vartotojui patiks žaidimas? (klasifikacija)</div>
+    <p class="sub-note">Tai uždavinys, kuriam mokytas NCF. Vertinama visoje natūralioje test aibėje.</p>
+    <table class="eval-table">
+        <thead><tr><th>Modelis</th><th>Accuracy</th><th>F1</th><th>AUC</th></tr></thead>
+        <tbody>
+        {% for r in ev.classification %}
+            <tr>
+                <td>{{ r.model }}</td>
+                <td class="num {% if r.best_accuracy %}best{% endif %}">{{ r.accuracy }}</td>
+                <td class="num {% if r.best_f1 %}best{% endif %}">{{ r.f1 }}</td>
+                <td class="num {% if r.best_auc %}best{% endif %}">{{ r.auc }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="sub-title">B) Kokius žaidimus parodyti? (Top-{{ ev.ranking.k }} rekomendacijos)</div>
+    <p class="sub-note">
+        Tai uždavinys, kurį sprendžia visos rekomendacijos. Kiekvienam vartotojui modelis
+        sudaro {{ ev.ranking.k }} žaidimų sąrašą iš žaidimų, kurių jis dar nematė; tikrinama, kiek iš jų
+        vartotojui vėliau tikrai patiko. Vertinta {{ "{:,}".format(ev.ranking.eval_users).replace(",", " ") }} vartotojų.
+    </p>
+    <table class="eval-table">
+        <thead><tr>
+            <th>Modelis</th><th>Recall@{{ ev.ranking.k }}</th><th>NDCG@{{ ev.ranking.k }}</th><th>HitRate@{{ ev.ranking.k }}</th>
+        </tr></thead>
+        <tbody>
+        {% for r in ev.ranking.models %}
+            <tr>
+                <td>{{ r.model }}</td>
+                <td class="num {% if r.best_recall %}best{% endif %}">{{ r.recall }}
+                    <div class="bar {% if r.best_recall %}best-bar{% endif %}"><span style="width: {{ r.bar_recall }}%"></span></div></td>
+                <td class="num {% if r.best_ndcg %}best{% endif %}">{{ r.ndcg }}
+                    <div class="bar {% if r.best_ndcg %}best-bar{% endif %}"><span style="width: {{ r.bar_ndcg }}%"></span></div></td>
+                <td class="num {% if r.best_hit %}best{% endif %}">{{ r.hit }}
+                    <div class="bar {% if r.best_hit %}best-bar{% endif %}"><span style="width: {{ r.bar_hit }}%"></span></div></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <p class="ds-line">
+        Duomenys: {{ "{:,}".format(ev.dataset.users).replace(",", " ") }} vartotojų ·
+        {{ ev.dataset.games }} žaidimų (bent {{ ev.dataset.game_min_reviews }} apžvalgų) ·
+        test aibė {{ "{:,}".format(ev.dataset.test).replace(",", " ") }} apžvalgų
+        ({{ (ev.dataset.positive_rate * 100)|round(1) }}% teigiamų) · suskaičiuota {{ ev.generated }}.
+        Visi modeliai vertinti ant tų pačių žaidimų.
+    </p>
+
+    {% if insights %}
+    <div class="explanation-block insights">
+        <div class="explanation-label">📊 Ką rodo skaičiai</div>
+        {% for t in insights %}<p>{{ t }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="pending">
+        Vertinimo rezultatai dar nesugeneruoti. Paleisk <code>python src/07_evaluate.py</code> –
+        jis sukurs <code>model_eval.json</code>.
+    </div>
+    {% endif %}
+
+    <div class="section-title">APRIBOJIMAI</div>
+    <ul class="limits">
+        <li>NCF dengia tik populiariausius (~670) žaidimus, todėl naujam ar retam žaidimui rekomendacijų nepateiks (cold start). Naujiems vartotojams modelis taip pat neturi savo vektoriaus.</li>
+        <li>„Patiko“ čia reiškia Steam apžvalgos „rekomenduoju“ žymą, o ne tikrą įvertinimą. Dauguma apžvalgų teigiamos, todėl vien F1 / Accuracy klaidina – žr. baseline'ą lentelėje.</li>
+        <li>Žmonės apžvelgia tik tai, ką jau žaidė, todėl duomenys šališki populiarių žaidimų link.</li>
+        <li>Vertinimui SVD perkeltas treniruoti tik ant train dalies (kitaip jis „matytų“ test duomenis), todėl jo skaičiai gali šiek tiek skirtis nuo svetainėje naudojamo SVD, kuris apima daugiau žaidimų.</li>
+        <li>Tai offline metrikos. Jos nepasako, ar rekomendacijos realiai patiko žmonėms – tam reikėtų vartotojų testo.</li>
+    </ul>
+
+    <div class="section-title">METRIKOS</div>
     <div class="definitions-grid">
         <div class="def-card">
-            <div class="def-title">Precision@K</div>
+            <div class="def-title">Accuracy · F1 · AUC</div>
             <p class="def-text">
-                Tikslumas — iš K rekomenduotų žaidimų, kiek yra relevantiški.
-                Relevantiškumas apibrėžiamas: du žaidimai laikomi panašiais,
-                jei juos abu žaidė ≥10 bendrų vartotojų.
-                <br><br>
-                <code>Precision@K = |relevantiški ∩ rekomenduoti| / K</code>
+                Accuracy – teisingų spėjimų dalis. F1 – balansas tarp tikslumo ir pilnumo teigiamai klasei.
+                AUC – tikimybė, kad modelis patikusį žaidimą įvertins aukščiau nei nepatikusį;
+                0,5 = metimas monetą, 1,0 = tobula. AUC nepriklauso nuo to, kad dauguma apžvalgų teigiamos.
             </p>
         </div>
         <div class="def-card">
-            <div class="def-title">Recall@K</div>
+            <div class="def-title">Recall@K · NDCG@K · HitRate@K</div>
             <p class="def-text">
-                Pilnumas — iš visų relevantiškų žaidimų, kiek pavyko
-                rasti tarp K rekomendacijų. Visada mažas skaičius, nes
-                relevantiškų žaidimų gali būti šimtai.
-                <br><br>
-                <code>Recall@K = |relevantiški ∩ rekomenduoti| / |visi relevantiški|</code>
+                Recall – kokią dalį vartotojui patikusių (ir dar nematytų) žaidimų radome tarp K rekomendacijų.
+                NDCG – kaip Recall, bet geriau vertina, kai tinkami žaidimai sąraše aukščiau.
+                HitRate – kokiai daliai vartotojų bent vienas iš K tiko.
             </p>
         </div>
     </div>
@@ -388,61 +454,6 @@
 <footer>
     Steam žaidimų paieškos sistema · CodeAcademy baigiamasis darbas · Kęstas Trybė · 2026
 </footer>
-
-{% if metrics %}
-<script>
-const metrics = {{ metrics | tojson }};
-
-const svd = metrics.find(m => m.model === 'svd') || {};
-const ncf = metrics.find(m => m.model === 'ncf') || {};
-
-const ctx = document.getElementById('metricsChart').getContext('2d');
-new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: ['Precision@10', 'Recall@10'],
-        datasets: [
-            {
-                label: 'SVD',
-                data: [svd.precision || 0, svd.recall || 0],
-                backgroundColor: 'rgba(79,255,176,0.3)',
-                borderColor: '#4fffb0',
-                borderWidth: 2,
-                borderRadius: 4,
-            },
-            {
-                label: 'NCF',
-                data: [ncf.precision || 0, ncf.recall || 0],
-                backgroundColor: 'rgba(0,180,255,0.3)',
-                borderColor: '#00b4ff',
-                borderWidth: 2,
-                borderRadius: 4,
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                labels: { color: '#e8eaf0', font: { family: 'DM Sans' } }
-            }
-        },
-        scales: {
-            x: {
-                ticks: { color: '#6b7280' },
-                grid: { color: 'rgba(42,45,58,0.5)' }
-            },
-            y: {
-                beginAtZero: true,
-                max: 1,
-                ticks: { color: '#6b7280' },
-                grid: { color: 'rgba(42,45,58,0.5)' }
-            }
-        }
-    }
-});
-</script>
-{% endif %}
 
 </body>
 </html>

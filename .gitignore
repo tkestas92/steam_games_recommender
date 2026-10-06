@@ -83,4 +83,4 @@ static/shap/*.png
 # FLASK / WEB
 # ─────────────────────────────────────────────────────────────────────────────
 instance/
-.webassets-cache
+.webassets-cachedata/

@@ -6,6 +6,14 @@ Modeliai: SVD (collaborative filtering) + NCF v28 (neural collaborative filterin
 
 # Operacinės sistemos funkcijos: keliai, aplinkos kintamieji
 import os
+# macOS (Apple Silicon): torch + numpy/Accelerate kartu gali sukelti "segmentation fault".
+# Šie kintamieji turi būti nustatyti PRIEŠ importuojant numpy/torch, todėl jie čia, o ne terminale.
+import sys
+if sys.platform == "darwin":
+    for _var in ("OMP_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+        os.environ.setdefault(_var, "1")
+    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 # JSON formatui: duomenų serializavimas ir deserializavimas
 import json
 # Unikalių sesijos ID generavimui
@@ -372,6 +380,11 @@ def search(query: str, top_k: int = 10, mode: str = "balanced",
             "header_image": r[7], "about": (r[8] or "")[:200],
             "user_reviews": r[9],
             "semantic_score": round(sem, 3),
+            # Balo išskaidymas — parodoma UI kaip "sem 0.72 | pop 0.15", kad
+            # vartotojas matytų iš ko susidėjo galutinis balas.
+            "sem_score": round(sem, 3),
+            "pop_score": round(pop, 3),
+            "rev_score": round(rev, 3),
             "score": round(score, 3),
         })
 
@@ -758,22 +771,36 @@ def index():
     return render_template("index.html", history=get_history(get_sid()))
 
 
+SEARCH_MODES = ["semantic", "keyword", "knn", "balanced", "popular", "logarithmic", "custom"]
+
+def run_single_mode(query: str, mode: str, w_sem: float, w_ratio: float, w_log: float, top_k: int = 10) -> list:
+    """Paleidžia tik VIENĄ pasirinktą paieškos režimą (naudojama kai compare=off)."""
+    if mode == "keyword":
+        return search_keyword(query, top_k=top_k)
+    if mode == "knn":
+        return search_knn(query, top_k=top_k)
+    return search(query, top_k=top_k, mode=mode, w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
+
+
 @app.route("/search")
 def search_route():
     """Paieškos rezultatų puslapis su input validation."""
     try:
-        query = request.args.get("q", "").strip()
-        mode  = request.args.get("mode", "balanced")
-        sid   = get_sid()
-        
+        query   = request.args.get("q", "").strip()
+        mode    = request.args.get("mode", "balanced")
+        # "Palyginti visus režimus" jungiklis — default OFF, kad vartotojui
+        # nebūtų rodoma 7 stulpelių iš karto. Pažymėjus checkbox'ą, gauname "1".
+        compare = request.args.get("compare", "") == "1"
+        sid     = get_sid()
+
         # Input validation
         if not query or len(query) < 2 or len(query) > 200:
             logger.warning(f"Netinkama paieškos užklausa: '{query}'")
             return render_template("index.html", error="Užklausa turi būti 2-200 ženklų", history=[])
-        
-        if mode not in ["semantic", "keyword", "knn", "balanced", "popular", "logarithmic", "custom"]:
+
+        if mode not in SEARCH_MODES:
             mode = "balanced"
-        
+
         # Pasirinktiniai svoriai su validacija
         try:
             w_sem   = max(0, min(1, float(request.args.get("w_sem",   0.8))))
@@ -781,26 +808,40 @@ def search_route():
             w_log   = max(0, min(1, float(request.args.get("w_log",   0.1))))
         except ValueError:
             w_sem, w_ratio, w_log = 0.8, 0.1, 0.1
-        
-        # Visų 7 paieškos režimų rezultatai
-        all_results = {
-        "keyword":     search_keyword(query, top_k=5),
-        "knn":         search_knn(query, top_k=5),
-        "balanced":    search(query, top_k=5, mode="balanced"),
-        "semantic":    search(query, top_k=5, mode="semantic"),
-        "popular":     search(query, top_k=5, mode="popular"),
-        "logarithmic": search(query, top_k=5, mode="logarithmic"),
-        "custom":      search(query, top_k=5, mode="custom",
-                              w_sem=w_sem, w_ratio=w_ratio, w_log=w_log),
-    }
 
-        # Išsaugome istoriją
-        save_search(sid, query, all_results["balanced"])
-        
+        if compare:
+            # Senas elgesys — visų 7 režimų rezultatai vienu metu, palyginimui.
+            all_results = {
+                "keyword":     search_keyword(query, top_k=5),
+                "knn":         search_knn(query, top_k=5),
+                "balanced":    search(query, top_k=5, mode="balanced"),
+                "semantic":    search(query, top_k=5, mode="semantic"),
+                "popular":     search(query, top_k=5, mode="popular"),
+                "logarithmic": search(query, top_k=5, mode="logarithmic"),
+                "custom":      search(query, top_k=5, mode="custom",
+                                      w_sem=w_sem, w_ratio=w_ratio, w_log=w_log),
+            }
+            history_results = all_results.get(mode) or all_results["balanced"]
+            save_search(sid, query, history_results)
+
+            return render_template("index.html",
+                                   query=query,
+                                   compare=True,
+                                   all_results=all_results,
+                                   results=None,
+                                   history=get_history(sid),
+                                   mode=mode,
+                                   w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
+
+        # Naujas default elgesys — tik pasirinktas režimas, viena paieška.
+        results = run_single_mode(query, mode, w_sem, w_ratio, w_log, top_k=10)
+        save_search(sid, query, results)
+
         return render_template("index.html",
                                query=query,
-                               all_results=all_results,
-                               results=all_results["balanced"],
+                               compare=False,
+                               all_results=None,
+                               results=results,
                                history=get_history(sid),
                                mode=mode,
                                w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
@@ -871,16 +912,64 @@ def game_detail(app_id):
         return "Klaida kraunant žaidimą", 500
 
 
+EVAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_eval.json")
+
+
+def load_model_eval():
+    """Skaito src/07_evaluate.py sugeneruotą model_eval.json (nepriklauso nuo DB)."""
+    try:
+        with open(EVAL_PATH, encoding="utf-8") as f:
+            ev = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None, []
+
+    # Pažymime geriausią kiekvienos metrikos reikšmę ir paruošiame juosteles lentelėms
+    for key in ("accuracy", "f1", "auc"):
+        best = max(r[key] for r in ev["classification"])
+        for r in ev["classification"]:
+            r["best_" + key] = (r[key] == best)
+    rk = ev["ranking"]["models"]
+    for key in ("recall", "ndcg", "hit"):
+        best = max(r[key] for r in rk)
+        for r in rk:
+            r["best_" + key] = (r[key] == best)
+            r["bar_" + key] = round(100 * r[key] / best) if best else 0
+
+    # Išvados generuojamos iš skaičių, todėl puslapis neprieštarauja rezultatams
+    insights = []
+    cls = {r["model"]: r for r in ev["classification"]}
+    base, ncf = cls.get("Visada „rekomenduoja“"), cls.get("NCF v28")
+    pos = ev["dataset"]["positive_rate"]
+    if base and ncf:
+        insights.append(
+            f"Test aibėje {pos:.0%} apžvalgų yra teigiamos, todėl net modelis, kuris visada sako "
+            f"„rekomenduoja“, gauna F1 = {base['f1']}. NCF gauna {ncf['f1']} "
+            f"(skirtumas {ncf['f1'] - base['f1']:+.3f}), todėl čia informatyviausias rodiklis yra AUC: "
+            f"NCF {ncf['auc']} (0,5 = atsitiktinis spėjimas)."
+        )
+    k = ev["ranking"]["k"]
+    best = max(rk, key=lambda r: r["ndcg"])
+    pop = next((r for r in rk if r["model"].startswith("Populiar")), None)
+    if pop:
+        insights.append(
+            f"Top-{k} reitinguose geriausią NDCG@{k} turi „{best['model']}“ ({best['ndcg']}); "
+            f"paprasčiausio baseline'o (populiariausi žaidimai) rodiklis – {pop['ndcg']}."
+        )
+    ncf_rk = next((r for r in rk if r["model"].startswith("NCF")), None)
+    if ncf_rk and pop and ncf_rk["ndcg"] < pop["ndcg"]:
+        insights.append(
+            "NCF treniruotas atskirti „patinka / nepatinka“, o ne rūšiuoti žaidimus, "
+            "todėl reitingavimo uždavinyje jis silpnesnis už paprastą populiarumą. "
+            "Tai nėra klaida – tai skirtingas uždavinys nei tas, kuriam modelis mokytas."
+        )
+    return ev, insights
+
+
 @app.route("/compare")
 def compare():
-    """Modelių palyginimo puslapis."""
-    with engine.connect() as conn:
-        rows = conn.execute(text("""
-            SELECT model_name, precision_k, recall_k, trained_at
-            FROM model_results ORDER BY trained_at DESC LIMIT 10
-        """)).fetchall()
-    metrics = [{"model": r[0], "precision": r[1], "recall": r[2], "date": str(r[3])} for r in rows]
-    return render_template("compare.html", metrics=metrics)
+    """Modelių aprašymas ir sąžiningo vertinimo rezultatai (iš model_eval.json)."""
+    ev, insights = load_model_eval()
+    return render_template("compare.html", ev=ev, insights=insights)
 
 
 @app.route("/profile")
