@@ -841,15 +841,22 @@ def search_route():
                                    w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
 
         # Naujas default elgesys — tik pasirinktas režimas, viena paieška.
+        import time as _t
+        t0 = _t.perf_counter()
         results = run_single_mode(query, mode, w_sem, w_ratio, w_log, top_k=10)
+        t1 = _t.perf_counter()
         save_search(sid, query, results)
+        t2 = _t.perf_counter()
+        history = get_history(sid)
+        t3 = _t.perf_counter()
+        logger.info(f"⏱ paieška {t1-t0:.2f}s | istorijos įrašymas {t2-t1:.2f}s | istorijos skaitymas {t3-t2:.2f}s")
 
         return render_template("index.html",
                                query=query,
                                compare=False,
                                all_results=None,
                                results=results,
-                               history=get_history(sid),
+                               history=history,
                                mode=mode,
                                w_sem=w_sem, w_ratio=w_ratio, w_log=w_log)
     except Exception as e:
