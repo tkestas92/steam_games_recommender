@@ -1051,5 +1051,13 @@ def clear_history():
 
 
 # Paleidžiame serverį jei failas vykdomas tiesiogiai
+# Užkrauname paieškos modelį iš anksto, kad pirma paieška nebūtų lėta
+try:
+    get_st_model()
+    get_faiss()
+    logger.info("   ✅ Paieškos modelis ir FAISS užkrauti iš anksto")
+except Exception as e:
+    logger.warning(f"   ⚠️ Išankstinis modelio užkrovimas nepavyko: {e}")
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, use_reloader=False)
