@@ -930,7 +930,7 @@
         const data = await resp.json();
         const el = document.getElementById('explanationText');
         if (el) {
-            el.textContent = data.explanation || 'Paaiškinimas nepasiekiamas.';
+            el.textContent = data.text || data.explanation || data.message || 'Paaiškinimas nepasiekiamas.';
         }
     } catch(e) {
         const el = document.getElementById('explanationText');
