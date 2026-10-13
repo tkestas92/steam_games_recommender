@@ -119,12 +119,26 @@ _st_model    = None  # Sentence transformer modelis
 _faiss_index = None  # FAISS vektorių indeksas
 _app_ids_np  = None  # Žaidimų app_id masyvas
 
+# Railway konteineris mato daug procesoriaus branduolių, bet turi tik kelis tikrus –
+# per daug torch gijų labai sulėtina. Ribojame (galima keisti per TORCH_THREADS).
+try:
+    torch.set_num_threads(int(os.getenv("TORCH_THREADS", "2")))
+except Exception:
+    pass
+
 def get_st_model():
     """Grąžina sentence transformer modelį, įkelia jei dar neįkeltas."""
     global _st_model
     if _st_model is None:
         _st_model = SentenceTransformer("all-mpnet-base-v2")
     return _st_model
+
+from functools import lru_cache
+
+@lru_cache(maxsize=256)
+def encode_query(query: str):
+    """Užklausos vektorius su kešu: ta pati frazė antrą kartą (pvz. AI paaiškinimui) neskaičiuojama iš naujo."""
+    return get_st_model().encode([query], convert_to_numpy=True, show_progress_bar=False).astype("float32")
 
 def get_faiss():
     """Grąžina FAISS indeksą ir app_id masyvą."""
@@ -321,9 +335,8 @@ def search(query: str, top_k: int = 10, mode: str = "balanced",
 
     # Paverčiame užklausą į vektorių
     try:
-        model        = get_st_model()
         index, aids  = get_faiss()
-        vec          = model.encode([query], convert_to_numpy=True).astype("float32")
+        vec          = encode_query(query).copy()
         # Normalizuojame (FAISS reikalavimas)
         faiss.normalize_L2(vec)
         # Ieškome artimiausių vektorių
@@ -1062,7 +1075,8 @@ def clear_history():
 try:
     get_st_model()
     get_faiss()
-    logger.info("   ✅ Paieškos modelis ir FAISS užkrauti iš anksto")
+    encode_query("warm up")  # pirmas vykdymas visada lėtesnis – atliekame iš anksto
+    logger.info("   ✅ Paieškos modelis ir FAISS užkrauti ir pašildyti")
 except Exception as e:
     logger.warning(f"   ⚠️ Išankstinis modelio užkrovimas nepavyko: {e}")
 
