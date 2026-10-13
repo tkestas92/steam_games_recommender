@@ -59,6 +59,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 # Google Gemini: RAG paaiškinimai
 from google import genai
+from google.genai import types as genai_types
 # PyTorch: neuroninis tinklas
 import torch
 import torch.nn as nn
@@ -598,7 +599,13 @@ def rag_explain_fn(query: str, top_k: int = 5) -> dict:
             f"Paaiškink kodėl šie žaidimai tinka (2-3 sakiniai), išskirk geriausią.\n"
             f"Atsakyk lietuviškai, glaustai (max 120 žodžių)."
         )
-        resp = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        resp = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                thinking_config=genai_types.ThinkingConfig(thinking_budget=0)  # be "mąstymo" – greičiau
+            ),
+        )
         return {"text": resp.text.strip(), "error": False}
     except Exception as e:
         logger.error(f"Gemini API klaida: {e}")
